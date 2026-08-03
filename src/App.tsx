@@ -78,48 +78,83 @@ export default function App() {
   const handleUpdateFocusGoal = (goal: string) => {
     setStats(prev => ({ ...prev, focusGoal: goal }));
   };
-
-  const handleSendMessage = async (e?: React.FormEvent) => {
+const handleSendMessage = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
   if (!chatInput.trim() || isGenerating) return;
 
   const userMessage = chatInput.trim();
-  setChatInput(""); // Clear input field
+  setChatInput("");
 
-  // 1. Add user message to chat UI immediately
+  // 1. Add user message + empty AI message placeholder
   const updatedMessages = [
     ...chatMessages,
-    { role: 'user' as const, text: userMessage }
+    { role: 'user' as const, text: userMessage },
+    { role: 'ai' as const, text: '' } // Placeholder for typewriter streaming
   ];
   setChatMessages(updatedMessages);
   setIsGenerating(true);
 
   try {
-    // 2. Fetch response from Express backend (/api/chat)
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         message: userMessage,
-        // Map messages into history array for local Llama
-        history: updatedMessages.slice(1, -1).map(m => ({
+        history: updatedMessages.slice(1, -2).map(m => ({
           role: m.role === 'ai' ? 'assistant' : 'user',
           content: m.text
         }))
       })
     });
 
-    const data = await res.json();
+    if (!res.ok || !res.body) {
+      throw new Error(`Server status ${res.status}`);
+    }
 
-    if (data.error) {
-      setChatMessages(prev => [...prev, { role: 'ai', text: `⚠️ ${data.error}` }]);
-    } else {
-      setChatMessages(prev => [...prev, { role: 'ai', text: data.reply || "No response generated." }]);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let accumulatedText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.replace('data: ', '').trim();
+          if (dataStr === '[DONE]') break;
+
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.content) {
+              accumulatedText += data.content;
+              
+              // Typewriter Effect: Dynamically update the last AI message token by token!
+              setChatMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = { role: 'ai', text: accumulatedText };
+                return next;
+              });
+            }
+          } catch (e) {
+            // Ignore partial lines
+          }
+        }
+      }
     }
   } catch (err) {
-    setChatMessages(prev => [...prev, { role: 'ai', text: "⚠️ Unable to reach Ollama. Ensure 'ollama serve' and ngrok are active!" }]);
+    console.error('Stream Error:', err);
+    setChatMessages(prev => {
+      const next = [...prev];
+      next[next.length - 1] = {
+        role: 'ai',
+        text: "⚠️ Stream error. Check 'ollama serve' and ngrok connection!"
+      };
+      return next;
+    });
   } finally {
     setIsGenerating(false);
   }
