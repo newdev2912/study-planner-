@@ -40,20 +40,22 @@
     background: #334155;
   }
 
-  /* Glow Effect */
-  .glow-hover {
-    position: relative;
-    transition: all 0.3s ease;
-  }
-  .glow-hover:hover::after {
+  /* Glow Effects */
+  .glow-orange:hover::after { background: #f97316; filter: blur(25px); opacity: 0.15; }
+  .glow-yellow:hover::after { background: #eab308; filter: blur(25px); opacity: 0.15; }
+  .glow-purple:hover::after { background: #a855f7; filter: blur(25px); opacity: 0.15; }
+  .glow-blue:hover::after { background: #3b82f6; filter: blur(25px); opacity: 0.15; }
+
+  .glow-orange:hover::after,
+  .glow-yellow:hover::after,
+  .glow-purple:hover::after,
+  .glow-blue:hover::after {
     content: '';
     position: absolute;
-    inset: -1px;
-    background: linear-gradient(45deg, #6366f1, #a855f7, #ec4899);
-    filter: blur(15px);
-    opacity: 0.15;
+    inset: -2px;
     z-index: -1;
     border-radius: inherit;
+    transition: opacity 0.3s ease;
   }
 }
 

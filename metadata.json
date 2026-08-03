@@ -1,5 +1,5 @@
 {
-  "name": "AcademiaQuest",
+  "name": "Study Planner",
   "description": "A gamified, AI-powered multi-subject study planner and learning manager.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

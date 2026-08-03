@@ -19,14 +19,15 @@ export default function App() {
       totalXP: 0,
       level: 1,
       streak: 0,
+      focusGoal: "",
       journalEntries: []
     };
   });
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-    { role: 'ai', text: "Hello! I'm your AcademiaQuest Assistant. Need to adjust your roadmap or syllabus today?" }
-  ]);
+  { role: 'ai', text: "Hello! I'm your local **Llama 3.2** assistant. Ask me anything about your studies!" }
+]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Persistence
@@ -67,31 +68,62 @@ export default function App() {
     });
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!chatInput.trim() || isGenerating) return;
-    const userMessage = chatInput.trim();
-    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
-    setChatInput("");
-    setIsGenerating(true);
-
-    try {
-      const res = await fetch('/api/generate-roadmap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: userMessage })
-      });
-      const data = await res.json();
-      if (data.daily_tasks) {
-        setJourney({ ...data, daily_tasks: data.daily_tasks.map((t: any, i: number) => ({ ...t, id: `ai-${Date.now()}-${i}`, completed: false })) });
-        setChatMessages(prev => [...prev, { role: 'ai', text: `Roadmap synchronized. **${data.journey_title}** is now active.` }]);
-      }
-    } catch (err) {
-      setChatMessages(prev => [...prev, { role: 'ai', text: "Signal lost. Unable to reach neural core." }]);
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleStartFresh = () => {
+    setJourney(prev => ({
+      ...prev,
+      daily_tasks: prev.daily_tasks.map(t => ({ ...t, completed: false }))
+    }));
   };
+
+  const handleUpdateFocusGoal = (goal: string) => {
+    setStats(prev => ({ ...prev, focusGoal: goal }));
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault();
+  if (!chatInput.trim() || isGenerating) return;
+
+  const userMessage = chatInput.trim();
+  setChatInput(""); // Clear input field
+
+  // 1. Add user message to chat UI immediately
+  const updatedMessages = [
+    ...chatMessages,
+    { role: 'user' as const, text: userMessage }
+  ];
+  setChatMessages(updatedMessages);
+  setIsGenerating(true);
+
+  try {
+    // 2. Fetch response from Express backend (/api/chat)
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        message: userMessage,
+        // Map messages into history array for local Llama
+        history: updatedMessages.slice(1, -1).map(m => ({
+          role: m.role === 'ai' ? 'assistant' : 'user',
+          content: m.text
+        }))
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      setChatMessages(prev => [...prev, { role: 'ai', text: `⚠️ ${data.error}` }]);
+    } else {
+      setChatMessages(prev => [...prev, { role: 'ai', text: data.reply || "No response generated." }]);
+    }
+  } catch (err) {
+    setChatMessages(prev => [...prev, { role: 'ai', text: "⚠️ Unable to reach Ollama. Ensure 'ollama serve' and ngrok are active!" }]);
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
   const downloadJournal = () => {
     const content = stats.journalEntries.map(e => `## ${e.date}\n**Prompt:** ${e.prompt}\n\n${e.content}\n\n---`).join('\n\n');
@@ -104,16 +136,23 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500/30">
-      <Header view={view} setView={setView} streak={stats.streak} />
+    <div className="h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500/30 flex flex-col overflow-hidden">
+      <Header 
+        view={view} 
+        setView={setView} 
+        streak={stats.streak} 
+        handleStartFresh={handleStartFresh} 
+      />
 
-      <main className="transition-all duration-500">
+      <main className="flex-1 overflow-hidden transition-all duration-500">
         {view === 'home' ? (
           <HomeView 
             journey={journey} 
+            stats={stats}
             completionPercentage={completionPercentage} 
             setView={setView} 
             downloadJournal={downloadJournal}
+            updateFocusGoal={handleUpdateFocusGoal}
           />
         ) : (
           <PlannerView 

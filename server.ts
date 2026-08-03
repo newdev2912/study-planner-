@@ -1,7 +1,18 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { getGeminiModel, SYSTEM_INSTRUCTION } from "./server/gemini.ts";
+import "dotenv/config";
+
+const SYSTEM_INSTRUCTION = `
+### SYSTEM ROLE
+You are the AcademiaQuest Academic Assistant. Your goal is to provide concise, helpful, and accurate answers to student questions about their studies, productivity, and academic subjects.
+
+### GUIDELINES
+- Be brief and direct.
+- Focus on academic support.
+- Do not use complex formatting; plain text or simple markdown is preferred.
+- Prioritize speed and accuracy.
+`;
 
 async function startServer() {
   const app = express();
@@ -9,26 +20,52 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Routes
-  app.post("/api/generate-roadmap", async (req, res) => {
+  // Main Chat API Route using Local Ollama (llama3.2)
+  app.post("/api/chat", async (req, res) => {
     try {
-      const { prompt } = req.body;
-      const ai = getGeminiModel();
-      
-      const result = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: prompt,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
+      const { message, history } = req.body;
+
+      const rawOllamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+      const ollamaBaseUrl = rawOllamaUrl.replace(/\/$/, ""); 
+
+      // Prepare messages array for Ollama
+      const messages = [
+        { role: "system", content: SYSTEM_INSTRUCTION },
+        ...(history || []),
+        { role: "user", content: message }
+      ];
+
+      const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "AcademiaQuest/1.0",
+          "ngrok-skip-browser-warning": "true",
         },
+        body: JSON.stringify({
+          model: "llama3.2",
+          messages,
+          stream: false
+        })
       });
 
-      const responseText = result.text;
-      res.json(JSON.parse(responseText || '{}'));
+      if (!response.ok) {
+        throw new Error(`Ollama returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.message?.content;
+
+      if (!content) {
+        throw new Error("No response content received from Ollama");
+      }
+
+      res.json({ reply: content });
     } catch (error: any) {
-      console.error("Gemini Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate roadmap" });
+      console.error("Ollama Local AI Error:", error);
+      res.status(500).json({ 
+        error: "Failed to connect to local Ollama. Ensure your server and ngrok are active." 
+      });
     }
   });
 

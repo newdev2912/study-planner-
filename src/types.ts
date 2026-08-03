@@ -7,6 +7,7 @@ export interface Task {
   estimated_minutes: number;
   xp_reward: 50 | 100 | 250;
   category: 'Theory' | 'Practical Application' | 'Review Day' | 'Boss Battle Project';
+  tags: string[];
   ai_daily_summary: string;
   journal_prompt: string;
   completed: boolean;
@@ -24,6 +25,7 @@ export interface UserStats {
   totalXP: number;
   level: number;
   streak: number;
+  focusGoal?: string;
   lastActiveDate?: string;
   journalEntries: JournalEntry[];
 }
