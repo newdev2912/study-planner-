@@ -11,6 +11,11 @@
     color: #f8fafc; /* slate-50 */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-family: 'Comic Neue', cursive;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Lobster', cursive;
   }
 
   /* Custom Scrollbar */
@@ -45,6 +50,8 @@
   .glow-yellow:hover::after { background: #eab308; filter: blur(25px); opacity: 0.15; }
   .glow-purple:hover::after { background: #a855f7; filter: blur(25px); opacity: 0.15; }
   .glow-blue:hover::after { background: #3b82f6; filter: blur(25px); opacity: 0.15; }
+  .glow-emerald:hover::after { background: #10b981; filter: blur(25px); opacity: 0.15; }
+  .glow-slate:hover::after { background: #64748b; filter: blur(25px); opacity: 0.15; }
 
   .glow-orange:hover::after,
   .glow-yellow:hover::after,

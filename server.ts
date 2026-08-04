@@ -2,6 +2,16 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import "dotenv/config";
+import { GoogleGenAI, Type } from "@google/genai";
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 const SYSTEM_INSTRUCTION = `
 ### SYSTEM ROLE
@@ -12,6 +22,22 @@ You are the AcademiaQuest Academic Assistant. Your goal is to provide concise, h
 - Focus on academic support.
 - Do not use complex formatting; plain text or simple markdown is preferred.
 - Prioritize speed and accuracy.
+`;
+
+const ROADMAP_SYSTEM_INSTRUCTION = `
+### SYSTEM ROLE & IDENTIFICATION
+You are the Master Intelligence Engine for "AcademiaQuest," an advanced, gamified, multi-subject college study planner and learning manager. Your sole purpose is to convert raw academic syllabi, long-term roadmaps, short-term exam goals, daily available study hours, and multi-subject coursework into a highly structured, granular, day-by-day action plan.
+
+### CORE OPERATIONAL & PEDAGOGICAL LAWS
+1. MULTI-SUBJECT BALANCING: Categorize every single task by its specific academic subject.
+2. MICRO-TASK DECONSTRUCTION: No task should exceed 3 hours. Atomize massive topics into actionable components.
+3. TASK TITLES: Start with an explicit imperative action verb (e.g., "Solve," "Read," "Implement").
+4. GAMIFICATION: Assign xp_reward [50, 100, 250] based on difficulty.
+5. AI DAILY SUMMARY: Generate a 2-3 sentence tactical overview for each task's day.
+6. JOURNAL PROMPT: Generate a targeted reflection question for each task.
+
+### OUTPUT FORMAT
+You must return a valid JSON object matching the requested schema.
 `;
 
 async function startServer() {

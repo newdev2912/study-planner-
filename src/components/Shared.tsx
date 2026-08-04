@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
-export const GlowCard = ({ children, className, onClick, glowColor }: { children: React.ReactNode, className?: string, onClick?: () => void, glowColor?: 'orange' | 'yellow' | 'purple' | 'blue' }) => (
+export const GlowCard = ({ children, className, onClick, glowColor }: { children: React.ReactNode, className?: string, onClick?: () => void, glowColor?: 'orange' | 'yellow' | 'purple' | 'blue' | 'emerald' | 'slate' }) => (
   <motion.div 
     whileHover={{ y: -2 }}
     onClick={onClick}

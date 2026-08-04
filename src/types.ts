@@ -11,6 +11,7 @@ export interface Task {
   ai_daily_summary: string;
   journal_prompt: string;
   completed: boolean;
+  priority?: 'low' | 'medium' | 'high';
   completedAt?: string;
 }
 
@@ -25,8 +26,9 @@ export interface UserStats {
   totalXP: number;
   level: number;
   streak: number;
+  tasksCompleted: number;
+  lastActiveDate: string;
   focusGoal?: string;
-  lastActiveDate?: string;
   journalEntries: JournalEntry[];
 }
 
@@ -34,4 +36,26 @@ export interface JournalEntry {
   date: string;
   content: string;
   prompt: string;
+}
+
+export interface Topic {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Module {
+  id: string;
+  name: string;
+  topics: Topic[];
+}
+
+export interface SubjectData {
+  id: string;
+  name: string;
+  modules: Module[];
+}
+
+export interface SubjectMasteryState {
+  subjects: SubjectData[];
 }
