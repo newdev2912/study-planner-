@@ -46,6 +46,37 @@ async function startServer() {
 
   app.use(express.json());
 
+  // AI Roadmap Generation Proxy (replicated from AIChat pattern)
+  app.post("/api/generate-roadmap", async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
+
+      const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
+        body: JSON.stringify({
+          model: "llama3.2",
+          prompt: prompt,
+          stream: false
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Roadmap Proxy Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Main Chat API Route using Local Ollama (llama3.2)
   app.post("/api/chat", async (req, res) => {
   try {
