@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Brain, X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Brain, X, ChevronRight, Terminal, Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../lib/utils';
 
@@ -23,94 +23,105 @@ export const AIChat = ({ isOpen, setIsOpen, input, setInput, messages, isGenerat
   }, [messages, isGenerating, isOpen]);
 
   return (
-    <div className={cn(
-      "fixed bottom-8 left-8 z-[60] transition-all duration-500 ease-in-out",
-      isOpen ? "w-[400px]" : "w-14"
-    )}>
-      <div className={cn(
-        "bg-slate-900/40 backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(168,85,247,0.15)] rounded-3xl overflow-hidden flex flex-col transition-all duration-500",
-        isOpen ? "h-[500px]" : "h-14 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] hover:border-purple-500/50"
-      )}>
-        {/* Chat Header */}
+    <>
+      {/* Floating Toggle Button (Visible when closed) */}
+      {!isOpen && (
         <button 
-          onClick={() => setIsOpen(!isOpen)}
-          className={cn(
-            "h-14 w-full px-4 flex items-center justify-between transition-all",
-            isOpen ? "bg-purple-600 text-white" : "bg-transparent text-purple-400"
-          )}
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-8 right-8 z-[60] w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.4)] border border-indigo-400/30 hover:scale-110 transition-all duration-300"
         >
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-              isOpen ? "bg-white/20" : "bg-purple-500/10 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
-            )}>
-              <Brain className="w-5 h-5" />
-            </div>
-            {isOpen && (
-              <div className="text-left">
-                <span className="block text-xs font-black uppercase tracking-widest leading-none">AI Navigator</span>
-                <span className="text-[10px] opacity-80 leading-none">Neural Core v2.0</span>
-              </div>
-            )}
-          </div>
-          {isOpen ? <X className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+          <Brain className="w-6 h-6" />
         </button>
+      )}
+
+      {/* Dockable Right Sidebar */}
+      <div className={cn(
+        "fixed top-0 right-0 h-screen z-[70] transition-all duration-500 ease-in-out border-l border-indigo-500/30 backdrop-blur-xl bg-slate-950/95 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.5)]",
+        isOpen ? "w-[400px]" : "w-0 overflow-hidden border-none"
+      )}>
+        {/* Header */}
+        <div className="h-16 px-6 border-b border-indigo-500/20 flex items-center justify-between bg-indigo-500/5">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+              <Terminal className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div>
+              <span className="block text-xs font-black uppercase tracking-widest text-indigo-100">AI Navigator</span>
+              <span className="text-[10px] text-indigo-400/60 font-mono">LLAMA_3.2_CORE</span>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Chat Body */}
-        {isOpen && (
-          <>
-            <div 
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-slate-950/20 scroll-smooth"
-            >
-              {messages.map((msg, i) => (
-                <div key={i} className={cn(
-                  "flex flex-col max-w-[85%]",
-                  msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start"
+        <div 
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-6 space-y-6 font-mono scroll-smooth no-scrollbar"
+        >
+          {messages.map((msg, i) => (
+            <div key={i} className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center gap-2 opacity-50">
+                <span className={cn(
+                  "text-[9px] font-black uppercase tracking-widest",
+                  msg.role === 'user' ? "text-white" : "text-indigo-400"
                 )}>
-                  <div className={cn(
-                    "px-4 py-2.5 rounded-2xl text-sm shadow-sm",
-                    msg.role === 'user' 
-                      ? "bg-purple-600 text-white rounded-tr-none" 
-                      : "bg-slate-900/80 backdrop-blur-md text-slate-300 border border-slate-800 rounded-tl-none"
-                  )}>
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
-                  </div>
-                </div>
-              ))}
-              {isGenerating && (
-                <div className="flex items-center gap-2 text-purple-400">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                    <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                    <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Processing...</span>
-                </div>
-              )}
-            </div>
-
-            {/* Chat Input */}
-            <form onSubmit={onSendMessage} className="p-4 bg-slate-900/50 border-t border-slate-800">
-              <div className="flex items-center gap-2 p-2 bg-slate-950/50 rounded-2xl border border-slate-800 focus-within:border-purple-500/50 focus-within:ring-2 focus-within:ring-purple-500/10 transition-all">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Sync roadmap instructions..."
-                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-2 py-1 text-slate-200"
-                />
-                <button 
-                  disabled={isGenerating || !input.trim()}
-                  className="p-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-all"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                  {msg.role === 'user' ? 'USER_PROMPT' : 'NAVIGATOR_CORE'}
+                </span>
+                <div className="h-[1px] flex-1 bg-white/5" />
               </div>
-            </form>
-          </>
-        )}
+              <div className={cn(
+                "text-xs leading-relaxed",
+                msg.role === 'user' ? "text-white/90" : "text-indigo-300 font-bold drop-shadow-[0_0_8px_rgba(129,140,248,0.3)]"
+              )}>
+                {msg.role === 'user' && <span className="text-indigo-500 mr-2">{'>'}</span>}
+                <ReactMarkdown components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>
+                }}>
+                  {msg.text}
+                </ReactMarkdown>
+              </div>
+            </div>
+          ))}
+          
+          {isGenerating && (
+            <div className="flex items-center gap-3 text-indigo-400/50 font-mono">
+              <span className="text-[10px] animate-pulse">SYSTEM_THINKING...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Chat Input */}
+        <div className="p-6 bg-slate-900/30 border-t border-indigo-500/20">
+          <form 
+            onSubmit={onSendMessage}
+            className="flex items-center gap-3 p-3 bg-slate-950 border border-indigo-500/20 rounded-xl focus-within:border-indigo-500/50 focus-within:shadow-[0_0_15px_rgba(79,70,229,0.1)] transition-all"
+          >
+            <span className="text-indigo-500 font-mono text-sm ml-1">{'>'}</span>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Execute command..."
+              className="flex-1 bg-transparent border-none focus:ring-0 text-xs text-indigo-100 placeholder:text-indigo-900 font-mono"
+            />
+            <button 
+              disabled={isGenerating || !input.trim()}
+              className="p-1.5 text-indigo-400 hover:text-indigo-300 disabled:opacity-30 transition-colors"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+          <div className="mt-4 flex items-center justify-between opacity-30">
+            <span className="text-[8px] font-mono text-slate-500 uppercase tracking-tighter">Secure Link: Active</span>
+            <span className="text-[8px] font-mono text-slate-500 uppercase tracking-tighter">LATENCY: 14MS</span>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };

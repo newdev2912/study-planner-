@@ -386,7 +386,6 @@ const handleSendMessage = async (e?: React.FormEvent) => {
             handleAddTask={handleAddTask}
             handleRemoveTask={handleRemoveTask}
             handleUpdateTask={handleUpdateTask}
-            setJourney={setJourney}
             level={level}
             levelProgress={levelProgress}
             subjectMastery={subjectMastery}

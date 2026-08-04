@@ -1,8 +1,9 @@
 import { Activity, Plus, Trash2, ChevronRight, ChevronDown, Check } from 'lucide-react';
-import { GlowCard, ProgressBar } from './Shared';
+import { ProgressBar } from './Shared';
 import { SubjectData } from '../types';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { DashboardPanel } from './DashboardPanel';
 
 interface SubjectMasteryProps {
   subjects: SubjectData[];
@@ -111,20 +112,19 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
   };
 
   return (
-    <GlowCard glowColor="yellow" className="h-full border-yellow-500/20 bg-yellow-500/[0.01]">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <Activity className="w-5 h-5 text-yellow-400" />
-          Subject Mastery
-        </h2>
+    <DashboardPanel 
+      title="Course Tracking" 
+      icon={<Activity />} 
+      accentColor="cyan"
+      headerAction={
         <button 
           onClick={() => setIsAddingSubject(true)}
-          className="p-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-400 hover:bg-yellow-500/20 transition-all"
+          className="p-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-400 hover:bg-cyan-500/20 transition-all"
         >
           <Plus className="w-4 h-4" />
         </button>
-      </div>
-
+      }
+    >
       <AnimatePresence>
         {isAddingSubject && (
           <motion.div 
@@ -139,10 +139,10 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
               value={newSubjectName}
               onChange={(e) => setNewSubjectName(e.target.value)}
               placeholder="Subject Name..."
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:ring-1 focus:ring-yellow-500/30"
+              className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:ring-1 focus:ring-cyan-500/30"
               onKeyDown={(e) => e.key === 'Enter' && addSubject()}
             />
-            <button onClick={addSubject} className="p-1.5 bg-yellow-600 text-white rounded-lg"><Check className="w-4 h-4"/></button>
+            <button onClick={addSubject} className="p-1.5 bg-cyan-600 text-white rounded-lg"><Check className="w-4 h-4"/></button>
             <button onClick={() => setIsAddingSubject(false)} className="p-1.5 bg-slate-800 text-slate-400 rounded-lg"><Trash2 className="w-4 h-4"/></button>
           </motion.div>
         )}
@@ -150,9 +150,9 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
 
       <div className="space-y-4 overflow-y-auto max-h-[500px] pr-2 no-scrollbar">
         {subjects.map((subject, i) => (
-          <div key={subject.id} className="bg-slate-950/40 border border-slate-800/50 rounded-xl overflow-hidden">
+          <div key={subject.id} className="bg-slate-900/40 border border-slate-800/50 rounded-xl overflow-hidden">
             <div 
-              className="p-4 cursor-pointer hover:bg-slate-900/30 transition-colors"
+              className="p-4 cursor-pointer hover:bg-slate-800/30 transition-colors"
               onClick={() => setExpandedSubject(expandedSubject === subject.id ? null : subject.id)}
             >
               <div className="flex justify-between items-center mb-2">
@@ -173,7 +173,7 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <ProgressBar progress={i === 0 ? 45 : 20} color="bg-yellow-500" />
+              <ProgressBar progress={i === 0 ? 45 : 20} color="bg-cyan-500" />
             </div>
 
             <AnimatePresence>
@@ -195,13 +195,13 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) => updateModule(subject.id, module.id, e.target.value)}
                               placeholder="Module Name..."
-                              className="bg-transparent border-none p-0 text-[10px] font-black text-yellow-400 uppercase tracking-widest focus:ring-0 w-full hover:bg-slate-800/20 rounded px-1 transition-colors"
+                              className="bg-transparent border-none p-0 text-[10px] font-black text-cyan-400 uppercase tracking-widest focus:ring-0 w-full hover:bg-slate-800/20 rounded px-1 transition-colors"
                             />
                           </div>
                           <div className="flex gap-1">
                             <button 
                               onClick={() => addTopic(subject.id, module.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-yellow-400 transition-all"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-cyan-400 transition-all"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
@@ -231,7 +231,7 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
                     ))}
                     <button 
                       onClick={() => addModule(subject.id)}
-                      className="w-full py-2 border border-dashed border-slate-800 rounded-lg text-[10px] font-bold text-slate-500 hover:border-yellow-500/30 hover:text-yellow-400 transition-all"
+                      className="w-full py-2 border border-dashed border-slate-800 rounded-lg text-[10px] font-bold text-slate-500 hover:border-cyan-500/30 hover:text-cyan-400 transition-all"
                     >
                       + Add Module
                     </button>
@@ -242,6 +242,6 @@ export const SubjectMastery = ({ subjects, setSubjects }: SubjectMasteryProps) =
           </div>
         ))}
       </div>
-    </GlowCard>
+    </DashboardPanel>
   );
 };
