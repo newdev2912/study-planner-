@@ -267,18 +267,26 @@ const handleSendMessage = async (e?: React.FormEvent) => {
   const userMessage = chatInput.trim();
   setChatInput("");
 
-  // 1. Add user message + empty AI message placeholder
+  // 1. Prepare chat messages history
   const updatedMessages = [
     ...chatMessages,
     { role: 'user' as const, text: userMessage },
-    { role: 'ai' as const, text: '' } // Placeholder for typewriter streaming
+    { role: 'ai' as const, text: '' } // Placeholder for streaming output
   ];
   setChatMessages(updatedMessages);
   setIsGenerating(true);
 
   try {
-    const baseUrl = (import.meta.env.VITE_OLLAMA_URL as string | undefined) || 'https://epiphany-machinist-ranking.ngrok-free.dev';
+    // Determine base URL, falling back to ngrok tunnel
+    const rawUrl = import.meta.env.VITE_OLLAMA_URL as string | undefined;
+    const baseUrl = (rawUrl && rawUrl.trim() !== '') ? rawUrl : 'https://epiphany-machinist-ranking.ngrok-free.dev';
     const endpoint = `${baseUrl.replace(/\/$/, '')}/api/chat`;
+
+    // 2. Format history for Ollama's API schema
+    const ollamaMessages = updatedMessages.slice(1, -1).map(m => ({
+      role: m.role === 'ai' ? 'assistant' : 'user',
+      content: m.text
+    }));
 
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -287,11 +295,9 @@ const handleSendMessage = async (e?: React.FormEvent) => {
         'ngrok-skip-browser-warning': 'true'
       },
       body: JSON.stringify({
-        message: userMessage,
-        history: updatedMessages.slice(1, -2).map(m => ({
-          role: m.role === 'ai' ? 'assistant' : 'user',
-          content: m.text
-        }))
+        model: 'llama3.2', // Ensure this matches your local Ollama model name
+        messages: ollamaMessages,
+        stream: true
       })
     });
 
@@ -311,25 +317,22 @@ const handleSendMessage = async (e?: React.FormEvent) => {
       const lines = chunk.split('\n');
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const dataStr = line.replace('data: ', '').trim();
-          if (dataStr === '[DONE]') break;
+        if (!line.trim()) continue;
 
-          try {
-            const data = JSON.parse(dataStr);
-            if (data.content) {
-              accumulatedText += data.content;
-              
-              // Typewriter Effect: Dynamically update the last AI message token by token!
-              setChatMessages(prev => {
-                const next = [...prev];
-                next[next.length - 1] = { role: 'ai', text: accumulatedText };
-                return next;
-              });
-            }
-          } catch (e) {
-            // Ignore partial lines
+        try {
+          const data = JSON.parse(line);
+          if (data.message?.content) {
+            accumulatedText += data.message.content;
+            
+            // Update UI token by token
+            setChatMessages(prev => {
+              const next = [...prev];
+              next[next.length - 1] = { role: 'ai', text: accumulatedText };
+              return next;
+            });
           }
+        } catch (e) {
+          // Ignore incomplete JSON stream lines
         }
       }
     }
