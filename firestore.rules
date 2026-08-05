@@ -54,6 +54,16 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // DAILY LOGS COLLECTION
+    match /users/{userId}/dailyLogs/{dateStr} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // USER STATS COLLECTION
+    match /users/{userId}/userStats/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
     // LEGACY CLEANUP (OPTIONAL)
     match /subject_mastery/{userId} {
       allow read, write: if isOwner(userId);

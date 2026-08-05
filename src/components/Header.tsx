@@ -25,12 +25,12 @@ export const Header = ({ view, setView, streak, handleStartFresh, handleDeleteAl
   return (
     <header className="h-20 border-b border-slate-800/60 bg-slate-950/25 backdrop-blur-xl sticky top-0 z-40">
       <div className="max-w-[1600px] mx-auto h-full px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setView('home')}>
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-cyan-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-cyan-500/10 border border-indigo-400/30">
-            SP
+        <div className="flex items-center gap-3.5 cursor-pointer group" onClick={() => setView('home')}>
+          <div className="w-10 h-10 bg-gradient-to-br from-amber-500 via-orange-600 to-red-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/25 border border-orange-400/40 group-hover:scale-105 transition-all duration-300">
+            <Flame className="w-6 h-6 text-amber-100 fill-amber-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.8)]" />
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-indigo-300 via-cyan-300 to-violet-300 bg-clip-text text-transparent leading-none mb-1 font-jakarta">
+            <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-amber-300 via-orange-300 to-rose-300 bg-clip-text text-transparent leading-none mb-1 font-jakarta">
               Study Planner
             </h1>
             <p className="text-[10px] font-bold text-slate-400 tracking-wider leading-none">
@@ -39,12 +39,14 @@ export const Header = ({ view, setView, streak, handleStartFresh, handleDeleteAl
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 bg-slate-900/40 p-1 rounded-xl border border-slate-800/60">
+        <nav className="flex items-center gap-1 bg-slate-900/40 p-1 rounded-xl border border-slate-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
           <button 
             onClick={() => setView('home')}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
-              view === 'home' ? "bg-slate-800 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              "flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-black tracking-wide uppercase transition-all duration-300",
+              view === 'home' 
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/40" 
+                : "text-slate-500 hover:text-slate-300 font-bold"
             )}
           >
             <Home className="w-4 h-4" />
@@ -53,8 +55,10 @@ export const Header = ({ view, setView, streak, handleStartFresh, handleDeleteAl
           <button 
             onClick={() => setView('planner')}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all",
-              view === 'planner' ? "bg-slate-800 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+              "flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-black tracking-wide uppercase transition-all duration-300",
+              view === 'planner' 
+                ? "bg-orange-500 text-white shadow-lg shadow-orange-500/25 border border-orange-400/40" 
+                : "text-slate-500 hover:text-slate-300 font-bold"
             )}
           >
             <GraduationCap className="w-4 h-4" />

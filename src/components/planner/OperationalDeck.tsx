@@ -99,10 +99,10 @@ export const OperationalHeader: React.FC<OperationalHeaderProps> = ({
               <div
                 key={sub.id}
                 className={cn(
-                  "flex items-center justify-between gap-2.5 px-3 py-1 rounded-xl border text-[11px] font-mono font-bold transition-all shrink-0 cursor-pointer",
-                  isDone && "bg-emerald-950/20 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10",
-                  isActive && "bg-cyan-950/20 border-cyan-500/50 text-cyan-300 shadow-sm shadow-cyan-500/10",
-                  !isDone && !isActive && "bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-slate-700"
+                  "flex items-center justify-between gap-2.5 px-3 py-1 rounded-xl border text-[11px] font-mono font-bold transition-all duration-200 shrink-0 cursor-pointer hover:scale-[1.04]",
+                  isDone && "bg-emerald-950/20 border-emerald-500/40 text-emerald-300 shadow-sm shadow-emerald-500/10 hover:border-emerald-400 hover:shadow-md hover:shadow-emerald-500/20",
+                  isActive && "bg-cyan-950/20 border-cyan-500/50 text-cyan-300 shadow-sm shadow-cyan-500/10 hover:border-cyan-400 hover:shadow-md hover:shadow-cyan-500/20",
+                  !isDone && !isActive && "bg-slate-900/60 border-slate-800/80 text-slate-400 hover:border-purple-500/50 hover:text-slate-200 hover:shadow-md hover:shadow-purple-500/10"
                 )}
               >
                 <div className="flex items-center gap-1.5">
@@ -134,10 +134,10 @@ export const OperationalHeader: React.FC<OperationalHeaderProps> = ({
       </div>
 
       {/* 3. BOTTOM SOLID RED PROGRESS BAR */}
-      <div className="w-full mt-2">
+      <div className="w-full mt-2 group cursor-pointer">
         <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800/50 p-[0.5px]">
           <div
-            className="h-full rounded-full bg-rose-500 transition-all duration-500 shadow-[0_0_12px_rgba(244,63,94,0.6)]"
+            className="h-full rounded-full bg-rose-500 transition-all duration-500 shadow-[0_0_12px_rgba(244,63,94,0.6)] group-hover:brightness-125 group-hover:shadow-[0_0_18px_rgba(244,63,94,0.95)]"
             style={{ width: `${Math.min(100, Math.max(0, overallProgress))}%` }}
           />
         </div>

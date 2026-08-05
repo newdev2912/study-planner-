@@ -113,7 +113,7 @@ export const DailyRefreshList = ({
   };
 
   return (
-    <div className="max-h-[350px] overflow-y-auto no-scrollbar flex flex-col gap-3 pr-2 mt-4">
+    <div className="max-h-[420px] overflow-y-auto flex flex-col gap-3 pb-3 pr-1.5 mt-2 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <AnimatePresence mode="popLayout">
         {tasks.length > 0 ? (
           tasks.map((task) => {

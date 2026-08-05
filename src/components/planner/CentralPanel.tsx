@@ -468,7 +468,7 @@ export const CentralPanel = ({
   ];
 
   return (
-    <div className="w-full h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col p-6 overflow-hidden backdrop-blur-md relative">
+    <div className="w-full h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col p-6 overflow-hidden backdrop-blur-md relative hover:z-10 hover:border-purple-500/40 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all duration-300">
       {/* Decorative Top active glow */}
       <div className={cn(
         "absolute top-0 left-1/4 right-1/4 h-[1px] blur-[1px] transition-all duration-700",
@@ -476,7 +476,7 @@ export const CentralPanel = ({
       )} />
 
       {/* Centered 2-Way Toggle Switch Header */}
-      <div className="flex justify-center items-center pb-2 mb-4 flex-shrink-0 relative w-full">
+      <div className="flex justify-center items-center pb-1 mb-2.5 flex-shrink-0 relative w-full">
         <div className="flex items-center bg-slate-900/40 p-1 rounded-xl border border-slate-800/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
           <button
             onClick={() => setViewMode('archive')}
@@ -1117,10 +1117,10 @@ export const CentralPanel = ({
                   onClick={handleDeploySession}
                   disabled={selectedTaskIds.length === 0}
                   className={cn(
-                    "px-4 py-2 font-black text-xs tracking-widest uppercase rounded-xl shadow-md transition-all flex items-center gap-1.5 border hover:scale-[1.02] active:scale-95 font-jakarta",
+                    "px-3 py-1.5 font-extrabold text-[10px] tracking-wider uppercase rounded-xl shadow-md transition-all flex items-center gap-1.5 border hover:scale-[1.03] active:scale-95 font-jakarta",
                     selectedTaskIds.length === 0
                       ? "bg-slate-900/50 border-slate-800/80 text-slate-600 cursor-not-allowed"
-                      : "bg-cyan-950/40 hover:bg-cyan-900/50 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
+                      : "bg-cyan-950/40 hover:bg-cyan-900/60 border-cyan-500/50 hover:border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
                   )}
                 >
                   <Activity className="w-3.5 h-3.5 animate-pulse text-cyan-400" />

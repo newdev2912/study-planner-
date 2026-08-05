@@ -67,9 +67,9 @@ export const LeftPanel = ({
   });
 
   return (
-    <div className="w-full h-full bg-black/30 border border-white/10 rounded-2xl flex flex-col p-4 overflow-hidden backdrop-blur-md">
+    <div className="w-full h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col p-4 overflow-hidden backdrop-blur-md relative hover:z-10 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300">
       {/* Header section */}
-      <div className="flex items-center gap-2 pb-3 mb-3 border-b border-white/5 flex-shrink-0">
+      <div className="flex items-center gap-2 pb-1.5 mb-2 flex-shrink-0">
         <BookOpen className="w-4 h-4 text-cyan-400" />
         <span className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">ACTIVE SESSION CHECKLISTS</span>
       </div>

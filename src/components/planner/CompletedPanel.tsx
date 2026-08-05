@@ -100,11 +100,11 @@ export const CompletedPanel = ({
   const activeCompletedList = tab === 'study' ? completedStudyGroups : completedDailyGroups;
 
   return (
-    <div className="flex-1 bg-slate-900/20 border border-slate-800/80 rounded-2xl flex flex-col p-4 overflow-hidden backdrop-blur-md relative min-h-0">
+    <div className="flex-1 bg-slate-900/20 border border-slate-800/80 rounded-2xl flex flex-col p-4 overflow-hidden backdrop-blur-md relative min-h-0 hover:z-10 hover:border-emerald-500/40 hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] transition-all duration-300">
       <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/25 to-transparent" />
       
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80 flex-shrink-0">
+      <div className="flex items-center justify-between pb-1.5 mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span className="text-[10px] font-black tracking-[0.2em] text-slate-300 uppercase font-jakarta">COMPLETED OBJECTIVES</span>

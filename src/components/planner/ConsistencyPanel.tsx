@@ -109,7 +109,7 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
     : (stats?.streak || 0);
 
   return (
-    <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 space-y-3.5 backdrop-blur-xl relative overflow-hidden shrink-0">
+    <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 space-y-2.5 backdrop-blur-xl relative overflow-hidden shrink-0 hover:z-10 hover:border-amber-500/40 hover:shadow-[0_0_20px_rgba(245,158,11,0.15)] transition-all duration-300">
       <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent" />
       
       {/* Header & Stats Cards */}
@@ -120,8 +120,8 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
             Consistency Index
           </h3>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-[10px] font-black uppercase tracking-wider animate-pulse">
-          <Flame className="w-3.5 h-3.5 fill-current"/>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-[10px] font-black uppercase tracking-wider group cursor-pointer hover:scale-105 hover:bg-amber-500/20 transition-all duration-300">
+          <Flame className="w-3.5 h-3.5 fill-current group-hover:scale-125 group-hover:text-amber-300 transition-all duration-300"/>
           <span>{computedStreakCount}D STREAK</span>
         </div>
       </div>

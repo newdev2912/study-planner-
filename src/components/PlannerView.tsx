@@ -261,6 +261,17 @@ export const PlannerView = ({
     const { toggleCompletedStagedItem } = await import('../lib/firebase/session');
     await toggleCompletedStagedItem(todayStr, itemId, nextCompletedState);
 
+    // Record XP and streak progress when checking off a focus task
+    if (nextCompletedState) {
+      import('../lib/firebase/progressTracker').then(mod => {
+        mod.recordDailyTaskCompletion(50, 'FOCUS').then(updatedStats => {
+          if (updatedStats && setStats) {
+            setStats(updatedStats);
+          }
+        }).catch(console.error);
+      });
+    }
+
     // Sync back to subjectMastery local state & Firebase
     if (taskId.startsWith("subject-") || itemId.split('_').length === 3) {
       const parts = itemId.split('_');

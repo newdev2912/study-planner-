@@ -23,7 +23,7 @@ export const SubjectGoalsList = ({ subjects }: { subjects: SubjectData[] }) => {
   }
 
   return (
-    <div className="flex flex-col gap-3 mt-4 overflow-y-auto no-scrollbar max-h-[280px] pr-1">
+    <div className="flex flex-col gap-3 mt-2 overflow-y-auto max-h-[420px] pb-3 pr-1.5 no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {subjects.map(subject => {
         const theme = priorityStyles[subject.priority || 'low'];
         return (

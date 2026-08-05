@@ -102,6 +102,12 @@
       "schema": "dailyFocusSession",
       "description": "User's daily focus sessions with staged and completed items"
     },
+    "/users/{userId}/dailyLogs/{dateStr}": {
+      "description": "User's daily activity logs for XP and completion tracking"
+    },
+    "/users/{userId}/userStats/{docId}": {
+      "description": "User stats summary breakdown"
+    },
     "/test/{docId}": {
       "description": "System test collection"
     },

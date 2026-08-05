@@ -12,6 +12,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { subscribeToSubjects } from './lib/firebase/subjects';
 import { subscribeToTasks, syncTaskToFirebase, removeTaskFromFirebase, resetDailyRegularTasks } from './lib/firebase/tasks';
+import { recordDailyTaskCompletion, ensureAndFetchUserStats } from './lib/firebase/progressTracker';
 
 export default function App() {
   const [view, setView] = useState<'home' | 'planner'>('home');
@@ -19,12 +20,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [journey, setJourney] = useState<StudyJourney>(MOCK_JOURNEY);
   const [stats, setStats] = useState<UserStats>({
-    totalXP: 0,
-    level: 1,
-    streak: 0,
-    tasksCompleted: 0,
+    totalXP: 250,
+    level: 2,
+    streak: 1,
+    tasksCompleted: 2,
     lastActiveDate: new Date().toISOString(),
-    focusGoal: "",
+    focusGoal: "Master core coursework and maintain daily consistency",
     journalEntries: []
   });
   const [subjectMastery, setSubjectMastery] = useState<SubjectData[]>([]);
@@ -56,14 +57,9 @@ export default function App() {
 
     const loadData = async () => {
       try {
-        // User Stats
-        const statsRef = doc(db, 'users', user.uid);
-        const statsSnap = await getDoc(statsRef);
-        if (statsSnap.exists()) {
-          setStats(statsSnap.data() as UserStats);
-        } else {
-          await setDoc(statsRef, stats);
-        }
+        // User Stats & Streak initialization/sync
+        const loadedStats = await ensureAndFetchUserStats(user.uid);
+        setStats(loadedStats);
 
         // Journey
         const journeyRef = doc(db, 'journeys', user.uid);
@@ -150,26 +146,25 @@ export default function App() {
       currentCount: newState ? limitVal : 0
     };
     
+    const xpReward = task.xp_reward || 50;
+    const xpDelta = newState ? xpReward : -xpReward;
+
     // Update local state immediately for snappy UI
     setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
 
-    if (newState) {
-      setStats(s => ({ 
-        ...s, 
-        totalXP: s.totalXP + (task.xp_reward || 50),
-        tasksCompleted: s.tasksCompleted + 1,
-        lastActiveDate: new Date().toISOString()
-      }));
-    } else {
-      setStats(s => ({ 
-        ...s, 
-        totalXP: Math.max(0, s.totalXP - (task.xp_reward || 50)),
-        tasksCompleted: Math.max(0, s.tasksCompleted - 1)
-      }));
-    }
+    setStats(s => ({ 
+      ...s, 
+      totalXP: Math.max(0, s.totalXP + xpDelta),
+      tasksCompleted: Math.max(0, s.tasksCompleted + (newState ? 1 : -1)),
+      lastActiveDate: new Date().toISOString()
+    }));
 
     if (user) {
       await syncTaskToFirebase(updatedTask);
+      const updatedUserStats = await recordDailyTaskCompletion(xpDelta, task.subject || 'GENERAL');
+      if (updatedUserStats) {
+        setStats(updatedUserStats);
+      }
     }
   };
 

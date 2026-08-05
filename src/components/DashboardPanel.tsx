@@ -90,7 +90,7 @@ export const DashboardPanel = ({
       hoverGlows[accentColor],
       className
     )}>
-      <div className="p-5 border-b border-slate-800/40 flex items-center justify-between bg-slate-950/20">
+      <div className="px-5 pt-4 pb-2 flex items-center justify-between bg-slate-950/20">
         <div className="flex items-center gap-3">
           {icon && <div className={cn("w-5 h-5", styles.icon)}>{icon}</div>}
           <h2 className={cn(
@@ -106,7 +106,7 @@ export const DashboardPanel = ({
           </div>
         )}
       </div>
-      <div className="flex-1 p-5 overflow-y-auto no-scrollbar">
+      <div className="flex-1 px-5 pt-1.5 pb-4 overflow-y-auto no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </div>
     </div>
