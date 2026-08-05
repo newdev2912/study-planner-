@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import "dotenv/config";
@@ -44,6 +45,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
 
   // AI Roadmap Generation Proxy (replicated from AIChat pattern)

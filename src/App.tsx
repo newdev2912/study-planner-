@@ -277,8 +277,8 @@ const handleSendMessage = async (e?: React.FormEvent) => {
   setIsGenerating(true);
 
   try {
-    // Determine base URL, falling back to ngrok tunnel
-    const rawUrl = import.meta.env.VITE_OLLAMA_URL as string | undefined;
+    // Determine base URL from VITE_BACKEND_URL or VITE_OLLAMA_URL, falling back to ngrok tunnel
+    const rawUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined) || (import.meta.env.VITE_OLLAMA_URL as string | undefined);
     const baseUrl = (rawUrl && rawUrl.trim() !== '') ? rawUrl : 'https://epiphany-machinist-ranking.ngrok-free.dev';
     const endpoint = `${baseUrl.replace(/\/$/, '')}/api/chat`;
 
