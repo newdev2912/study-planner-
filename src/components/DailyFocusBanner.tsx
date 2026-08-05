@@ -13,7 +13,7 @@ export const DailyFocusBanner = ({ focusGoal, updateFocusGoal }: DailyFocusBanne
 
   return (
     <div className="flex-shrink-0">
-      <div className="bg-slate-950/80 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-xl shadow-cyan-500/5 py-4 px-6 transition-all duration-300">
+      <div className="bg-slate-950/25 backdrop-blur-md border border-slate-800/60 rounded-2xl shadow-xl hover:border-slate-700/50 hover:bg-slate-950/35 py-4 px-6 transition-all duration-300">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 border border-cyan-500/20">
             <Target className="w-5 h-5" />

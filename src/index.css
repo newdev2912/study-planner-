@@ -15,7 +15,7 @@
   }
 
   h1, h2, h3, h4, h5, h6, .font-display {
-    font-family: 'Lobster', cursive;
+    font-family: 'Outfit', sans-serif;
   }
 
   /* Custom Scrollbar */
@@ -52,6 +52,14 @@
   .glow-blue:hover::after { background: #3b82f6; filter: blur(25px); opacity: 0.15; }
   .glow-emerald:hover::after { background: #10b981; filter: blur(25px); opacity: 0.15; }
   .glow-slate:hover::after { background: #64748b; filter: blur(25px); opacity: 0.15; }
+
+  .glass-panel {
+    @apply bg-slate-950/20 backdrop-blur-xl border border-slate-800/40 shadow-2xl transition-all duration-500;
+  }
+
+  .glass-panel:hover {
+    @apply border-emerald-500/40 bg-slate-950/30 shadow-[0_0_30px_rgba(16,185,129,0.15)];
+  }
 
   .glow-orange:hover::after,
   .glow-yellow:hover::after,

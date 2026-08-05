@@ -1,59 +1,57 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Global Default Deny
+    // 1. MASTER DENY
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helper Functions ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    // GLOBALS
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // VALIDATION HELPERS
+    function isValidSubject(data) {
+      return data.keys().hasAll(['id', 'name', 'modules'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.modules is list;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    // SYSTEM TEST
+    match /test/{docId} {
+      allow read: if true;
     }
 
-    // --- Validation Helpers ---
-    function isValidUserStats(data) {
-      return data.keys().hasAll(['totalXP', 'streak', 'lastActiveDate', 'tasksCompleted'])
-        && data.totalXP is int
-        && data.streak is int
-        && data.lastActiveDate is string
-        && data.tasksCompleted is int;
+    // SUBJECTS COLLECTION
+    match /users/{userId}/subjects/{subjectId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidId(subjectId) && isValidSubject(incoming());
+      allow update: if isOwner(userId) && isValidSubject(incoming());
+      allow delete: if isOwner(userId);
     }
 
-    function isValidJourney(data) {
-      return data.keys().hasAll(['journey_title', 'daily_tasks'])
-        && data.journey_title is string
-        && data.journey_title.size() <= 200
-        && data.daily_tasks is list;
-    }
-
-    function isValidMastery(data) {
-      return data.keys().hasAll(['subjects'])
-        && data.subjects is list;
-    }
-
-    // --- Collection Rules ---
+    // USER DATA (STATS)
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidUserStats(request.resource.data);
+      allow read, write: if isOwner(userId);
     }
 
+    // JOURNEYS COLLECTION
     match /journeys/{userId} {
-      allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidJourney(request.resource.data);
+      allow read, write: if isOwner(userId);
     }
 
+    // TASKS COLLECTION
+    match /users/{userId}/tasks/{taskId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // LEGACY CLEANUP (OPTIONAL)
     match /subject_mastery/{userId} {
-      allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidMastery(request.resource.data);
+      allow read, write: if isOwner(userId);
     }
   }
 }

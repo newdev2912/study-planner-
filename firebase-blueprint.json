@@ -1,73 +1,97 @@
 {
   "entities": {
-    "UserStats": {
-      "title": "User Stats",
-      "description": "Gamification metrics and progress for the user",
+    "subject": {
+      "title": "Academic Subject",
+      "description": "An academic subject containing modules and topics",
       "type": "object",
       "properties": {
-        "totalXP": { "type": "integer", "description": "Total experience points earned" },
-        "streak": { "type": "integer", "description": "Current daily login/task streak" },
-        "lastActiveDate": { "type": "string", "format": "date-time", "description": "ISO timestamp of last activity" },
-        "tasksCompleted": { "type": "integer", "description": "Total number of tasks completed" },
-        "level": { "type": "integer", "description": "Current user level" }
-      },
-      "required": ["totalXP", "streak", "lastActiveDate", "tasksCompleted"]
-    },
-    "StudyJourney": {
-      "title": "Study Journey",
-      "description": "The overall academic roadmap and daily tasks",
-      "type": "object",
-      "properties": {
-        "journey_title": { "type": "string", "maxLength": 200 },
-        "current_milestone": { "type": "string", "maxLength": 200 },
-        "total_estimated_days": { "type": "integer" },
-        "daily_tasks": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "subject": { "type": "string" },
-              "task_title": { "type": "string" },
-              "completed": { "type": "boolean" },
-              "xp_reward": { "type": "integer" },
-              "priority": { "type": "string", "enum": ["low", "medium", "high"] }
-            }
-          }
-        }
-      }
-    },
-    "SubjectMastery": {
-      "title": "Subject Mastery",
-      "description": "Detailed progress tracking per subject",
-      "type": "object",
-      "properties": {
-        "subjects": {
+        "id": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 100 },
+        "deadline": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "modules": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "id": { "type": "string" },
               "name": { "type": "string" },
-              "modules": { "type": "array" }
+              "deadline": { "type": "string" },
+              "topics": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "title": { "type": "string" },
+                    "completed": { "type": "boolean" }
+                  }
+                }
+              }
             }
           }
         }
+      },
+      "required": ["id", "name", "modules"]
+    },
+    "stats": {
+      "title": "User Statistics",
+      "type": "object",
+      "properties": {
+        "totalXP": { "type": "integer" },
+        "level": { "type": "integer" },
+        "streak": { "type": "integer" },
+        "tasksCompleted": { "type": "integer" },
+        "lastActiveDate": { "type": "string", "format": "date-time" },
+        "focusGoal": { "type": "string" },
+        "journalEntries": { "type": "array" }
+      }
+    },
+    "journey": {
+      "title": "Study Journey",
+      "type": "object",
+      "properties": {
+        "journey_title": { "type": "string" },
+        "current_milestone": { "type": "string" },
+        "total_estimated_days": { "type": "integer" },
+        "daily_tasks": { "type": "array" }
+      }
+    },
+    "task": {
+      "title": "Daily Task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "subject": { "type": "string" },
+        "task_title": { "type": "string" },
+        "estimated_minutes": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "type": { "type": "string", "enum": ["regular", "subject"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastResetDate": { "type": "string", "format": "date" }
       }
     }
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": "UserStats",
-      "description": "User progress and statistics"
+      "schema": "stats",
+      "description": "User's overall statistics and metadata"
+    },
+    "/users/{userId}/subjects/{subjectId}": {
+      "schema": "subject",
+      "description": "User's academic subjects"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "task",
+      "description": "User's daily and subject-specific tasks"
+    },
+    "/test/{docId}": {
+      "description": "System test collection"
     },
     "/journeys/{userId}": {
-      "schema": "StudyJourney",
-      "description": "The user's active study roadmap"
-    },
-    "/subject_mastery/{userId}": {
-      "schema": "SubjectMastery",
-      "description": "The user's subject-specific progress"
+      "schema": "journey",
+      "description": "User's current study roadmap"
     }
   }
 }

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { StudyJourney, UserStats, SubjectData } from './types';
+import { StudyJourney, UserStats, SubjectData, Task } from './types';
 import { MOCK_JOURNEY } from './mockData';
 import { Header } from './components/Header';
 import { HomeView } from './components/HomeView';
 import { PlannerView } from './components/PlannerView';
 import { AIChat } from './components/AIChat';
+import { AuthPage } from './components/AuthPage';
 import { db, auth } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { subscribeToSubjects } from './lib/firebase/subjects';
+import { subscribeToTasks, syncTaskToFirebase, removeTaskFromFirebase, resetDailyRegularTasks } from './lib/firebase/tasks';
 
 export default function App() {
   const [view, setView] = useState<'home' | 'planner'>('home');
@@ -25,57 +28,33 @@ export default function App() {
     journalEntries: []
   });
   const [subjectMastery, setSubjectMastery] = useState<SubjectData[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-    { role: 'ai', text: "Hello! I'm your local **Llama 3.2** assistant. Ask me anything about your studies!" }
+    { role: 'ai', text: "Hello! I'm your academic assistant. Ask me anything about your studies!" }
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const initialLoadDone = useRef(false);
 
-  // 1. Auth Setup with Local Fallback
+  // 1. Auth Setup
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-      } else {
-        try {
-          await signInAnonymously(auth);
-        } catch (error: any) {
-          if (error.code === 'auth/admin-restricted-operation') {
-            console.warn("⚠️ Cloud Sync requires 'Anonymous Auth' enabled in Firebase Console. Using Local Mode.");
-          } else {
-            console.error("Firebase Auth Error:", error.code);
-          }
-          // Fallback to a local identity to keep the app functional
-          setUser({ uid: 'local-guest', isLocal: true });
-        }
+      setUser(u);
+      if (!u) {
+        setLoading(false);
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // 2. Load Data (Firestore or Local Storage)
+  // 2. Load Data (Firestore)
   useEffect(() => {
     if (!user) return;
 
     const loadData = async () => {
-      if (user.isLocal) {
-        const savedStats = localStorage.getItem('academia_quest_stats');
-        const savedJourney = localStorage.getItem('academia_quest_journey');
-        const savedMastery = localStorage.getItem('academia_quest_mastery');
-
-        if (savedStats) setStats(JSON.parse(savedStats));
-        if (savedJourney) setJourney(JSON.parse(savedJourney));
-        if (savedMastery) setSubjectMastery(JSON.parse(savedMastery));
-        
-        initialLoadDone.current = true;
-        setLoading(false);
-        return;
-      }
-
       try {
         // User Stats
         const statsRef = doc(db, 'users', user.uid);
@@ -94,23 +73,6 @@ export default function App() {
         } else {
           await setDoc(journeyRef, journey);
         }
-
-        // Subject Mastery
-        const masteryRef = doc(db, 'subject_mastery', user.uid);
-        const masterySnap = await getDoc(masteryRef);
-        if (masterySnap.exists()) {
-          setSubjectMastery((masterySnap.data() as {subjects: SubjectData[]}).subjects);
-        } else {
-          const initialSubs = Array.from(new Set(journey.daily_tasks.map(t => t.subject))).map((name, i) => ({
-            id: `subject-${i}`,
-            name,
-            modules: [
-              { id: `mod-${i}-1`, name: 'Core Foundations', topics: [{ id: `top-${i}-1`, title: 'Introduction', completed: true }] }
-            ]
-          }));
-          setSubjectMastery(initialSubs);
-          await setDoc(masteryRef, { subjects: initialSubs });
-        }
       } catch (err) {
         console.error("Firestore Load Error:", err);
       } finally {
@@ -122,23 +84,44 @@ export default function App() {
     loadData();
   }, [user]);
 
+  // Real-time Subject Subscription
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToSubjects((subjects) => {
+      if (subjects.length > 0) {
+        setSubjectMastery(subjects);
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Real-time Tasks Subscription
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToTasks((newTasks) => {
+      setTasks(newTasks);
+      resetDailyRegularTasks(newTasks);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   // 3. Save Data (Firestore AND Local Backup)
   useEffect(() => {
     if (!user || !initialLoadDone.current) return;
     localStorage.setItem('academia_quest_stats', JSON.stringify(stats));
-    if (!user.isLocal) setDoc(doc(db, 'users', user.uid), stats).catch(console.error);
+    setDoc(doc(db, 'users', user.uid), stats).catch(console.error);
   }, [stats, user]);
 
   useEffect(() => {
     if (!user || !initialLoadDone.current) return;
     localStorage.setItem('academia_quest_journey', JSON.stringify(journey));
-    if (!user.isLocal) setDoc(doc(db, 'journeys', user.uid), journey).catch(console.error);
+    setDoc(doc(db, 'journeys', user.uid), journey).catch(console.error);
   }, [journey, user]);
 
   useEffect(() => {
     if (!user || !initialLoadDone.current) return;
     localStorage.setItem('academia_quest_mastery', JSON.stringify(subjectMastery));
-    if (!user.isLocal) setDoc(doc(db, 'subject_mastery', user.uid), { subjects: subjectMastery }).catch(console.error);
+    // Individual subject sync is now handled by SubjectsPanel.tsx
   }, [subjectMastery, user]);
 
   // Stats derived
@@ -152,66 +135,87 @@ export default function App() {
   );
 
   // Handlers
-  const handleToggleTask = (taskId: string) => {
-    setJourney(prev => {
-      const newTasks = prev.daily_tasks.map(t => {
+  const handleToggleTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const newState = !task.completed;
+    const limitVal = task.targetCount !== undefined ? task.targetCount : (task.limit || 1);
+    const updatedTask: Task = { 
+      ...task, 
+      completed: newState, 
+      isCompleted: newState,
+      completedAt: newState ? new Date().toISOString() : undefined,
+      count: newState ? limitVal : 0,
+      currentCount: newState ? limitVal : 0
+    };
+    
+    // Update local state immediately for snappy UI
+    setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+
+    if (newState) {
+      setStats(s => ({ 
+        ...s, 
+        totalXP: s.totalXP + (task.xp_reward || 50),
+        tasksCompleted: s.tasksCompleted + 1,
+        lastActiveDate: new Date().toISOString()
+      }));
+    } else {
+      setStats(s => ({ 
+        ...s, 
+        totalXP: Math.max(0, s.totalXP - (task.xp_reward || 50)),
+        tasksCompleted: Math.max(0, s.tasksCompleted - 1)
+      }));
+    }
+
+    if (user) {
+      await syncTaskToFirebase(updatedTask);
+    }
+  };
+
+  const handleAddTask = async (type: 'regular' | 'subject' = 'regular') => {
+    const newTask: Task = {
+      id: `task-${Date.now()}`,
+      subject: type === 'subject' ? (subjectMastery[0]?.name || 'General') : 'General',
+      task_title: 'New Task',
+      estimated_minutes: 30,
+      completed: false,
+      isCompleted: false,
+      priority: 'medium',
+      count: 0,
+      currentCount: 0,
+      limit: type === 'regular' ? 3 : 1,
+      targetCount: type === 'regular' ? 3 : 1,
+      type,
+      createdAt: new Date().toISOString(),
+      lastResetDate: new Date().toISOString().split('T')[0]
+    };
+    
+    setTasks(prev => [newTask, ...prev]);
+    if (user) {
+      await syncTaskToFirebase(newTask);
+    }
+  };
+
+  const handleRemoveTask = async (taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    if (user) {
+      await removeTaskFromFirebase(taskId);
+    }
+  };
+
+  const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
+    setTasks(prev => {
+      const updated = prev.map(t => {
         if (t.id === taskId) {
-          const newState = !t.completed;
-          if (newState) {
-            setStats(s => ({ 
-              ...s, 
-              totalXP: s.totalXP + t.xp_reward,
-              tasksCompleted: s.tasksCompleted + 1,
-              lastActiveDate: new Date().toISOString()
-            }));
-          } else {
-            setStats(s => ({ 
-              ...s, 
-              totalXP: Math.max(0, s.totalXP - t.xp_reward),
-              tasksCompleted: Math.max(0, s.tasksCompleted - 1)
-            }));
-          }
-          return { ...t, completed: newState };
+          const next = { ...t, ...updates };
+          if (user) syncTaskToFirebase(next);
+          return next;
         }
         return t;
       });
-      return { ...prev, daily_tasks: newTasks };
+      return updated;
     });
-  };
-
-  const handleAddTask = () => {
-    const newTask: any = {
-      id: `task-${Date.now()}`,
-      day_number: 1,
-      subject: 'New Subject',
-      task_title: 'New Task',
-      description: 'Describe your task here...',
-      estimated_minutes: 30,
-      xp_reward: 50,
-      category: 'Theory',
-      ai_daily_summary: 'Keep going!',
-      journal_prompt: 'What did you learn?',
-      completed: false,
-      priority: 'medium'
-    };
-    setJourney(prev => ({
-      ...prev,
-      daily_tasks: [newTask, ...prev.daily_tasks]
-    }));
-  };
-
-  const handleRemoveTask = (taskId: string) => {
-    setJourney(prev => ({
-      ...prev,
-      daily_tasks: prev.daily_tasks.filter(t => t.id !== taskId)
-    }));
-  };
-
-  const handleUpdateTask = (taskId: string, updates: Partial<any>) => {
-    setJourney(prev => ({
-      ...prev,
-      daily_tasks: prev.daily_tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
-    }));
   };
 
   const handleStartFresh = () => {
@@ -227,7 +231,7 @@ export default function App() {
     try {
       localStorage.clear();
       
-      if (user && !user.isLocal) {
+      if (user) {
         // We don't delete the user auth, just the data docs
         const { deleteDoc, doc } = await import('firebase/firestore');
         await Promise.all([
@@ -355,11 +359,34 @@ const handleSendMessage = async (e?: React.FormEvent) => {
 
   if (loading) {
     return (
-      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-widest text-slate-500 animate-pulse">Initializing Neural Link...</p>
+      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Background Orbs */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-1000" />
+        
+        <div className="relative z-10 flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-slate-800 rounded-2xl" />
+            <div className="absolute inset-0 w-16 h-16 border-4 border-t-blue-500 border-r-blue-500/50 border-b-transparent border-l-transparent rounded-2xl animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+            </div>
+          </div>
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
+              ACADEMIA QUEST
+            </h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+              Synchronizing Neural Link
+            </p>
+          </div>
+        </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return <AuthPage />;
   }
 
   return (
@@ -370,7 +397,6 @@ const handleSendMessage = async (e?: React.FormEvent) => {
         streak={stats.streak} 
         handleStartFresh={handleStartFresh} 
         handleDeleteAllData={handleDeleteAllData}
-        isLocal={user?.isLocal}
       />
 
       <main className="flex-1 overflow-hidden transition-all duration-500">
@@ -378,9 +404,9 @@ const handleSendMessage = async (e?: React.FormEvent) => {
           <HomeView 
             journey={journey} 
             stats={stats}
+            tasks={tasks}
             completionPercentage={completionPercentage} 
             setView={setView} 
-            downloadJournal={downloadJournal}
             updateFocusGoal={handleUpdateFocusGoal}
             handleToggleTask={handleToggleTask}
             handleAddTask={handleAddTask}
@@ -394,13 +420,18 @@ const handleSendMessage = async (e?: React.FormEvent) => {
         ) : (
           <PlannerView 
             journey={journey} 
+            setJourney={setJourney}
             stats={stats} 
+            setStats={setStats}
             completionPercentage={completionPercentage} 
             level={level}
             levelProgress={levelProgress}
             nextLevelXP={nextLevelXP}
             setView={setView}
             handleToggleTask={handleToggleTask}
+            subjectMastery={subjectMastery}
+            setSubjectMastery={setSubjectMastery}
+            tasks={tasks}
           />
         )}
       </main>

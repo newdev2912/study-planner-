@@ -17,7 +17,8 @@ export const MOCK_JOURNEY: StudyJourney = {
       tags: ['Study', 'Math'],
       ai_daily_summary: "Today's focus is on multi-variable changes. Calculus is the foundation for your Physics simulations later this week.",
       journal_prompt: "What was the most challenging part of visualizing partial derivatives today?",
-      completed: false
+      completed: false,
+      type: 'subject'
     },
     {
       id: "2",
@@ -31,7 +32,8 @@ export const MOCK_JOURNEY: StudyJourney = {
       tags: ['Coding', 'Practice'],
       ai_daily_summary: "CS tasks today transition from theory to hard implementation. Balance is key in trees and in your study schedule.",
       journal_prompt: "Explain how AVL rotations maintain O(log n) height in your own words.",
-      completed: false
+      completed: false,
+      type: 'subject'
     },
     {
       id: "3",
@@ -45,7 +47,8 @@ export const MOCK_JOURNEY: StudyJourney = {
       tags: ['Review', 'Biology'],
       ai_daily_summary: "Bio is your recovery subject today. High-level conceptual flowcharts will help you memorize the energy cycles.",
       journal_prompt: "Which step in the Krebs cycle do you find most difficult to recall?",
-      completed: false
+      completed: false,
+      type: 'subject'
     }
   ]
 };
