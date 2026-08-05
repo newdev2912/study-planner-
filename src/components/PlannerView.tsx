@@ -536,6 +536,9 @@ export const PlannerView = ({
             tasks={tasks}
             subjectMastery={subjectMastery}
             onToggleSubTask={handleToggleSubTaskSelection}
+            activeSession={activeSession}
+            activeSessionTasks={activeSessionTasks}
+            onToggleSubTaskCompletion={handleToggleSubTaskCompletion}
           />
         </div>
 

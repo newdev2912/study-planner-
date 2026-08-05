@@ -114,32 +114,30 @@ export const CompletedPanel = ({
         </span>
       </div>
 
-      {/* Tab Switcher - Beautiful 2-Way Pill Slider Design matching central panel */}
-      <div className="flex justify-center items-center mb-3 flex-shrink-0 relative w-full">
-        <div className="flex items-center w-full bg-slate-950/60 p-1 rounded-full border border-slate-900 shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
-          <button
-            onClick={() => setTab('study')}
-            className={cn(
-              "flex-1 text-[9px] font-black tracking-wider py-1.5 px-3 rounded-full transition-all duration-300 select-none",
-              tab === 'study' 
-                ? "bg-rose-600 text-white font-extrabold shadow-[0_0_12px_rgba(225,29,72,0.4)] border border-rose-500/20"
-                : "text-slate-500 hover:text-slate-300"
-            )}
-          >
-            STUDY TRACKS
-          </button>
-          <button
-            onClick={() => setTab('daily')}
-            className={cn(
-              "flex-1 text-[9px] font-black tracking-wider py-1.5 px-3 rounded-full transition-all duration-300 select-none",
-              tab === 'daily' 
-                ? "bg-amber-500 text-slate-950 font-extrabold shadow-[0_0_12px_rgba(245,158,11,0.4)] border border-amber-400/20"
-                : "text-slate-500 hover:text-slate-300"
-            )}
-          >
-            DAILY TASKS
-          </button>
-        </div>
+      {/* Tab Switcher - Pill and Track Design */}
+      <div className="flex bg-slate-900/40 p-1 rounded-xl border border-slate-800/60 mb-4 flex-shrink-0">
+        <button
+          onClick={() => setTab('study')}
+          className={cn(
+            "flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg",
+            tab === 'study'
+              ? "bg-rose-600 text-white shadow-lg shadow-rose-500/20"
+              : "text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Study Tracks
+        </button>
+        <button
+          onClick={() => setTab('daily')}
+          className={cn(
+            "flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg",
+            tab === 'daily'
+              ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+              : "text-slate-500 hover:text-slate-300"
+          )}
+        >
+          Daily Tasks
+        </button>
       </div>
 
       {/* Completed list viewport */}

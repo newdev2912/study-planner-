@@ -5,13 +5,11 @@ import {
   Sparkles, Plus, Check, Play, Pause, RotateCcw, Activity, FileText, 
   Brain, CheckSquare, Square, Settings, Award, AlertCircle, Clock, PawPrint
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid 
-} from 'recharts';
 import { StudyJourney, Task } from '../../types';
 import { cn } from '../../lib/utils';
 import { priorityTheme } from './PlannerTheme';
 import { ProgressBar } from '../Shared';
+import { FocusModePanel, COLOR_THEMES, ColorThemeKey } from './FocusModePanel';
 
 interface CentralPanelProps {
   journey: StudyJourney;
@@ -26,6 +24,9 @@ interface CentralPanelProps {
   tasks?: Task[];
   subjectMastery?: any[];
   onToggleSubTask?: (taskId: string, subTaskId: string) => void;
+  activeSession?: any | null;
+  activeSessionTasks?: Task[];
+  onToggleSubTaskCompletion?: (taskId: string, subTaskId: string) => void;
 }
 
 export const CentralPanel = ({
@@ -40,7 +41,10 @@ export const CentralPanel = ({
   onStartSession,
   tasks = [],
   subjectMastery = [],
-  onToggleSubTask
+  onToggleSubTask,
+  activeSession = null,
+  activeSessionTasks = [],
+  onToggleSubTaskCompletion
 }: CentralPanelProps) => {
   const [viewMode, setViewMode] = useState<'archive' | 'focus'>('archive');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -60,42 +64,123 @@ export const CentralPanel = ({
   const [showAddTaskBar, setShowAddTaskBar] = useState(false);
 
   // Focus View Countdown States
-  const [timerMinutes, setTimerMinutes] = useState(25);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [timerActive, setTimerActive] = useState(false);
+  const [maxTimeMinutes, setMaxTimeMinutes] = useState<number>(25);
+  const [timeLeft, setTimeLeft] = useState<number>(25 * 60);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
   const [timerMode, setTimerMode] = useState<'work' | 'break'>('work');
+  const [focusThemeKey, setFocusThemeKey] = useState<ColorThemeKey>('cyan');
 
-  // Timer Effect
+  // Timer Ticker Loop
   useEffect(() => {
     let interval: any = null;
-    if (timerActive) {
+    if (isRunning) {
       interval = setInterval(() => {
-        if (timerSeconds > 0) {
-          setTimerSeconds(timerSeconds - 1);
-        } else if (timerSeconds === 0) {
-          if (timerMinutes === 0) {
-            // Timer finished
-            setTimerActive(false);
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            setIsRunning(false);
+            // Toggle Mode on completion
             if (timerMode === 'work') {
               setTimerMode('break');
-              setTimerMinutes(5);
-              alert("Work interval completed! Time for a short break.");
+              setTimeLeft(5 * 60);
+              setMaxTimeMinutes(5);
             } else {
               setTimerMode('work');
-              setTimerMinutes(25);
-              alert("Break finished! Let's focus.");
+              setTimeLeft(25 * 60);
+              setMaxTimeMinutes(25);
             }
-          } else {
-            setTimerMinutes(timerMinutes - 1);
-            setTimerSeconds(59);
+            return 0;
           }
-        }
+          return prev - 1;
+        });
       }, 1000);
     } else {
       clearInterval(interval);
     }
     return () => clearInterval(interval);
-  }, [timerActive, timerMinutes, timerSeconds, timerMode]);
+  }, [isRunning, timerMode]);
+
+  const handleStartTimer = () => setIsRunning(true);
+  const handlePauseTimer = () => setIsRunning(false);
+  const handleResetTimer = () => {
+    setIsRunning(false);
+    setTimeLeft(maxTimeMinutes * 60);
+  };
+  const handleUpdateTime = (minutes: number) => {
+    setIsRunning(false);
+    setMaxTimeMinutes(minutes);
+    setTimeLeft(minutes * 60);
+  };
+
+  // Parse total and completed staged tasks dynamically for the Focus Panel
+  const hasFirestoreSession = activeSession && activeSession.items && activeSession.items.length > 0;
+
+  // Compute activeTasks for Focus Spotlight Queue
+  const getFocusActiveTasks = (): Task[] => {
+    if (hasFirestoreSession) {
+      const items = activeSession.items.filter((i: any) => i.isStaged);
+      const groups: { [key: string]: Task } = {};
+      items.forEach((item: any) => {
+        const key = `${item.subjectId}_${item.moduleId}`;
+        if (!groups[key]) {
+          groups[key] = {
+            id: item.subjectId,
+            subject: item.subjectName,
+            task_title: item.moduleName,
+            completed: false,
+            priority: item.priority || 'medium',
+            type: 'subject',
+            estimated_minutes: 60,
+            subTasks: []
+          };
+        }
+        groups[key].subTasks!.push({
+          id: item.id, // e.g. "subjectId_moduleId_topicId"
+          title: item.topicTitle,
+          completed: item.isCompleted,
+          selected: true
+        });
+      });
+      return Object.values(groups).map(g => {
+        const total = g.subTasks?.length || 0;
+        const completed = g.subTasks?.filter(st => st.completed).length || 0;
+        return {
+          ...g,
+          completed: total > 0 && completed === total
+        };
+      });
+    } else {
+      return activeSessionTasks.map(t => ({
+        ...t,
+        subTasks: t.subTasks?.filter(st => st.selected).map(st => ({
+          id: st.id,
+          title: st.title,
+          completed: st.completed,
+          selected: true
+        })) || []
+      }));
+    }
+  };
+
+  const focusActiveTasks = getFocusActiveTasks();
+  let totalStagedTasks = 0;
+  let completedStagedTasks = 0;
+
+  if (hasFirestoreSession) {
+    totalStagedTasks = activeSession.items.filter((i: any) => i.isStaged).length;
+    completedStagedTasks = activeSession.items.filter((i: any) => i.isStaged && i.isCompleted).length;
+  } else if (tasks && activeSessionTaskIds.length > 0) {
+    const activeTasks = tasks.filter(t => activeSessionTaskIds.includes(t.id));
+    const totalSubTasks = activeTasks.reduce((acc, t) => acc + (t.subTasks?.filter(st => st.selected).length || 0), 0);
+    const completedSubTasks = activeTasks.reduce((acc, t) => acc + (t.subTasks?.filter(st => st.selected && st.completed).length || 0), 0);
+    
+    if (totalSubTasks > 0) {
+      totalStagedTasks = totalSubTasks;
+      completedStagedTasks = completedSubTasks;
+    } else {
+      totalStagedTasks = activeTasks.length;
+      completedStagedTasks = activeTasks.filter(t => t.completed).length;
+    }
+  }
 
   // Handle task selection
   const toggleTaskSelection = (taskId: string) => {
@@ -357,7 +442,6 @@ export const CentralPanel = ({
   };
 
   const unifiedTasks = getUnifiedTasks();
-  const activeSessionTasks = unifiedTasks.filter(t => activeSessionTaskIds.includes(t.id));
   
   // Chart 1 data: Subject distribution
   const chartSubjectData = activeSessionTasks.map(t => {
@@ -388,7 +472,7 @@ export const CentralPanel = ({
       {/* Decorative Top active glow */}
       <div className={cn(
         "absolute top-0 left-1/4 right-1/4 h-[1px] blur-[1px] transition-all duration-700",
-        viewMode === 'focus' ? "bg-cyan-500/80 shadow-[0_0_10px_rgba(6,182,212,0.5)]" : "bg-amber-500/80"
+        viewMode === 'focus' ? COLOR_THEMES[focusThemeKey].glowLine : "bg-amber-500/80"
       )} />
 
       {/* Centered 2-Way Toggle Switch Header */}
@@ -410,7 +494,7 @@ export const CentralPanel = ({
             className={cn(
               "px-4 py-1.5 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all duration-300",
               viewMode === 'focus'
-                ? "bg-cyan-500 text-white shadow-lg shadow-cyan-500/20"
+                ? `${COLOR_THEMES[focusThemeKey].tabBg} text-slate-950 shadow-lg ${COLOR_THEMES[focusThemeKey].tabShadow}`
                 : "text-slate-500 hover:text-slate-300"
             )}
           >
@@ -1051,129 +1135,20 @@ export const CentralPanel = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
               transition={{ duration: 0.15 }}
-              className="h-full flex flex-col md:flex-row gap-6 overflow-y-auto no-scrollbar pb-10"
+              className="h-full overflow-hidden"
             >
-              {/* Left Column: Pomodoro Clock timer (MD: 5/12) */}
-              <div className="md:w-5/12 bg-slate-950/40 border border-slate-850 rounded-2xl p-5 flex flex-col items-center justify-center relative min-h-[300px]">
-                {/* Decorative scanning neon line */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent animate-pulse" />
-
-                <span className={cn(
-                  "text-[9px] font-black tracking-[0.25em] uppercase mb-4",
-                  timerMode === 'work' ? "text-cyan-400" : "text-emerald-400 animate-pulse"
-                )}>
-                  {timerMode === 'work' ? 'FOCUS INTERVAL ACTIVE' : 'BREAK TIME DETECTED'}
-                </span>
-
-                {/* Circular timer indicator visual */}
-                <div className="relative w-40 h-40 rounded-full border-4 border-slate-900 flex flex-col items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.05)]">
-                  <span className="text-4xl font-mono font-black text-slate-100 tracking-wider">
-                    {String(timerMinutes).padStart(2, '0')}:{String(timerSeconds).padStart(2, '0')}
-                  </span>
-                  <span className="text-[8px] font-black tracking-widest text-slate-500 uppercase mt-1">MINUTES</span>
-
-                  {/* Pulsing ring indicator */}
-                  {timerActive && (
-                    <div className="absolute inset-0 rounded-full border border-cyan-500/30 animate-ping opacity-75" style={{ animationDuration: '3s' }} />
-                  )}
-                </div>
-
-                {/* Clock controller row */}
-                <div className="flex items-center gap-3 mt-6">
-                  <button
-                    onClick={() => setTimerActive(!timerActive)}
-                    className={cn(
-                      "px-4 py-2 rounded-xl text-[9px] font-black tracking-widest uppercase flex items-center gap-1.5 transition-transform active:scale-95",
-                      timerActive 
-                        ? "bg-amber-600 hover:bg-amber-500 text-white" 
-                        : "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)]"
-                    )}
-                  >
-                    {timerActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    {timerActive ? 'PAUSE CLOCK' : 'START CLOCK'}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setTimerActive(false);
-                      setTimerMinutes(timerMode === 'work' ? 25 : 5);
-                      setTimerSeconds(0);
-                    }}
-                    className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-850 rounded-xl text-slate-400 hover:text-white transition-colors"
-                    title="Reset Interval"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Right Column: Learning Telemetry Graphs (MD: 7/12) */}
-              <div className="md:w-7/12 flex flex-col gap-4">
-                {/* Visual statistics overview */}
-                <div className="bg-slate-950/20 border border-slate-850 rounded-2xl p-4 flex-1 min-h-[220px] flex flex-col">
-                  <div className="flex items-center justify-between mb-3 border-b border-slate-900 pb-2">
-                    <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">SUBJECT TELEMETRY DISTRIBUTION</span>
-                    <span className="text-[8px] font-bold text-slate-500">REAL-TIME SELECTION LOGS</span>
-                  </div>
-
-                  <div className="flex-1 min-h-[160px] w-full">
-                    {chartSubjectData.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center">
-                        <Activity className="w-8 h-8 text-slate-800 mb-1" />
-                        <span className="text-[8px] font-black text-slate-600 tracking-wider">WAITING FOR METRICS...</span>
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartSubjectData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                          <XAxis dataKey="subject" stroke="#64748b" fontSize={9} />
-                          <YAxis stroke="#64748b" fontSize={9} />
-                          <Tooltip 
-                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
-                            labelStyle={{ color: '#fff', fontSize: '10px', fontWeight: 'bold' }}
-                            itemStyle={{ fontSize: '10px' }}
-                          />
-                          <Bar dataKey="XP Reward" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Target Min" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </div>
-                </div>
-
-                {/* Sub statistics: cognitive energy AreaChart */}
-                <div className="bg-slate-950/20 border border-slate-850 rounded-2xl p-4 flex-1 min-h-[160px] flex flex-col">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] font-black tracking-widest text-slate-400 uppercase">COGNITIVE ENERGY INDEX</span>
-                    <span className="text-[8px] text-cyan-400 font-bold animate-pulse">OPTIMAL FLUX STATE</span>
-                  </div>
-
-                  <div className="flex-1 min-h-[110px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartSessionData}>
-                        <defs>
-                          <linearGradient id="colorEnergy" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.2}/>
-                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="colorCognitive" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.2}/>
-                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <XAxis dataKey="name" stroke="#64748b" fontSize={8} />
-                        <Tooltip 
-                          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
-                          labelStyle={{ color: '#fff', fontSize: '9px', fontWeight: 'bold' }}
-                          itemStyle={{ fontSize: '9px' }}
-                        />
-                        <Area type="monotone" dataKey="Energy level" stroke="#06b6d4" fillOpacity={1} fill="url(#colorEnergy)" />
-                        <Area type="monotone" dataKey="Cognitive Index" stroke="#a855f7" fillOpacity={1} fill="url(#colorCognitive)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
+              <FocusModePanel 
+                maxTimeMinutes={maxTimeMinutes}
+                timeLeft={timeLeft}
+                isRunning={isRunning}
+                onStartTimer={handleStartTimer}
+                onPauseTimer={handlePauseTimer}
+                onResetTimer={handleResetTimer}
+                activeSessionActive={activeSessionActive}
+                onUpdateTime={handleUpdateTime}
+                currentThemeKey={focusThemeKey}
+                onThemeChange={setFocusThemeKey}
+              />
             </motion.div>
           )}
         </AnimatePresence>

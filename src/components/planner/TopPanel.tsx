@@ -64,14 +64,14 @@ export const TopPanel = ({
   const isActive = hasFirestoreSession ? activeSession.isActive : (activeSessionTasks.length > 0);
 
   return (
-    <div className="relative w-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-md flex flex-col p-4 flex-shrink-0">
+    <div className="relative w-full bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden backdrop-blur-md flex flex-col p-3 sm:p-4 flex-shrink-0">
       {/* Top Section */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Left Side: Brand & Title */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+        {/* Left Side: Base button & Operational Deck Title */}
         <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
           <button
             onClick={() => setView('home')}
-            className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all flex items-center gap-1.5 text-xs font-black"
+            className="p-2 bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl transition-all flex items-center gap-1.5 text-xs font-black shrink-0 active:scale-95"
             title="Return to Base"
           >
             <Home className="w-4 h-4 text-purple-400" />
@@ -79,14 +79,14 @@ export const TopPanel = ({
           </button>
           
           <div className="flex flex-col">
-            <span className="text-[9px] font-black text-purple-400 tracking-[0.25em] uppercase">SYSTEM OPERATIONAL DECK</span>
-            <h1 className="text-sm font-black text-slate-100 tracking-tight truncate max-w-[280px] sm:max-w-xs md:max-w-sm">
+            <span className="text-[9px] font-black text-purple-400 tracking-[0.2em] uppercase leading-none">SYSTEM OPERATIONAL DECK</span>
+            <h1 className="text-xs sm:text-sm font-black text-slate-100 tracking-tight truncate max-w-[200px] sm:max-w-xs md:max-w-sm mt-1">
               {journeyTitle}
             </h1>
           </div>
         </div>
 
-        {/* Middle Section: Dynamic Task Selection Strip */}
+        {/* Middle Section: Subject Carousel Strip */}
         <div className="flex items-center gap-1.5 flex-1 w-full max-w-2xl">
           <button 
             onClick={() => scroll('left')} 
@@ -97,7 +97,7 @@ export const TopPanel = ({
 
           <div 
             ref={scrollContainerRef}
-            className="flex items-center gap-3 overflow-x-auto no-scrollbar scroll-smooth flex-1 px-1 py-1"
+            className="flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-smooth flex-1 px-1 py-1"
           >
             {!isActive ? (
               <div className="text-[10px] font-bold text-slate-500 italic tracking-wider py-1 select-none w-full text-center">
@@ -120,25 +120,27 @@ export const TopPanel = ({
                   <div
                     key={card.subjectId}
                     className={cn(
-                      "px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-wide whitespace-nowrap transition-all border shrink-0 flex flex-col gap-1 relative overflow-hidden min-w-[120px]",
+                      "px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-wide whitespace-nowrap transition-all border shrink-0 flex flex-col gap-1.5 relative overflow-hidden min-w-[110px]",
                       isSubjectCompleted
                         ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
                         : themeClass
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="truncate max-w-[90px] text-slate-200">{card.subjectName}</span>
-                      <span className="font-mono text-[9px] text-cyan-400">
+                      <span className="truncate max-w-[80px] text-slate-200 font-bold lowercase">
+                        {card.subjectName.toLowerCase()}
+                      </span>
+                      <span className="font-mono text-[9px] text-cyan-400 font-bold">
                         {card.completed}/{card.total}
                       </span>
                     </div>
                     
                     {/* Micro-progress bar */}
-                    <div className="w-full h-1 bg-slate-950/60 rounded-full overflow-hidden mt-0.5">
+                    <div className="w-full h-1 bg-slate-950/60 rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${progressPct}%` }}
                         className={cn(
-                          "h-full transition-all duration-300",
+                          "h-full transition-all duration-300 rounded-full",
                           isSubjectCompleted 
                             ? "bg-emerald-400" 
                             : card.taskCategory === 'CODE' 
@@ -170,7 +172,7 @@ export const TopPanel = ({
                   <div
                     key={task.id}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wide whitespace-nowrap transition-all border shrink-0 flex items-center gap-2",
+                      "px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-wide whitespace-nowrap transition-all border shrink-0 flex items-center gap-2",
                       isTaskCompleted
                         ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
                         : themeClass
@@ -181,7 +183,7 @@ export const TopPanel = ({
                     ) : (
                       <Circle className="w-3 h-3 text-slate-500 shrink-0" />
                     )}
-                    <span>
+                    <span className="lowercase">
                       [{task.subject}] {task.task_title}
                     </span>
                   </div>
@@ -198,15 +200,15 @@ export const TopPanel = ({
           </button>
         </div>
 
-        {/* Right Side: Neon Percentage Indicator (Replacing buttons) */}
-        <div className="shrink-0 flex items-center gap-2 bg-slate-950/80 px-4 py-1.5 rounded-full border border-slate-800/80">
+        {/* Right Side: Session Completed indicator capsule */}
+        <div className="shrink-0 flex items-center gap-2 bg-slate-950/80 px-3.5 py-1.5 rounded-full border border-slate-800/80">
           <span className="text-[9px] font-black text-slate-500 tracking-wider uppercase">SESSION COMPLETED</span>
           <span className="text-xs font-black text-cyan-400 font-mono tracking-widest">{Math.round(completionPercentage)}%</span>
         </div>
       </div>
 
       {/* Full width progress bar along bottom edge */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-slate-950/80">
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-950/80">
         <motion.div 
           initial={{ width: 0 }}
           animate={{ width: `${completionPercentage}%` }}
