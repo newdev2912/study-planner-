@@ -277,9 +277,15 @@ const handleSendMessage = async (e?: React.FormEvent) => {
   setIsGenerating(true);
 
   try {
-    const res = await fetch('/api/chat', {
+    const baseUrl = (import.meta.env.VITE_OLLAMA_URL as string | undefined) || 'https://epiphany-machinist-ranking.ngrok-free.dev';
+    const endpoint = `${baseUrl.replace(/\/$/, '')}/api/chat`;
+
+    const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true'
+      },
       body: JSON.stringify({
         message: userMessage,
         history: updatedMessages.slice(1, -2).map(m => ({
