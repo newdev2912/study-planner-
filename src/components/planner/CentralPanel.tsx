@@ -1117,14 +1117,14 @@ export const CentralPanel = ({
                   onClick={handleDeploySession}
                   disabled={selectedTaskIds.length === 0}
                   className={cn(
-                    "px-4 py-2 text-white font-black text-[9px] tracking-widest uppercase rounded-xl shadow-md transition-all flex items-center gap-1.5 border hover:scale-[1.03] active:scale-95",
+                    "px-4 py-2 font-black text-xs tracking-widest uppercase rounded-xl shadow-md transition-all flex items-center gap-1.5 border hover:scale-[1.02] active:scale-95 font-jakarta",
                     selectedTaskIds.length === 0
-                      ? "bg-slate-900/50 border-slate-850 text-slate-500 border-dashed cursor-not-allowed"
-                      : "bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 border-purple-500/20 shadow-[0_0_15px_rgba(157,78,221,0.25)]"
+                      ? "bg-slate-900/50 border-slate-800/80 text-slate-600 cursor-not-allowed"
+                      : "bg-cyan-950/40 hover:bg-cyan-900/50 border-cyan-500/50 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
                   )}
                 >
-                  <Activity className="w-3.5 h-3.5 animate-pulse" />
-                  POPULATE & START SESSION
+                  <Activity className="w-3.5 h-3.5 animate-pulse text-cyan-400" />
+                  POPULATE
                 </button>
               </div>
             </motion.div>

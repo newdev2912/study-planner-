@@ -507,6 +507,7 @@ export const PlannerView = ({
         completionPercentage={activeSession ? (activeSession.totalTasks > 0 ? (activeSession.completedTasks / activeSession.totalTasks) * 100 : 0) : activeSessionProgress}
         setView={setView}
         activeSession={activeSession}
+        onTitleChange={(newTitle) => setJourney(prev => ({ ...prev, journey_title: newTitle }))}
       />
 
       {/* Main workspace layout grid: Left, Central, and Right Panels */}

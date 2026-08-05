@@ -25,15 +25,17 @@ export const Header = ({ view, setView, streak, handleStartFresh, handleDeleteAl
   return (
     <header className="h-20 border-b border-slate-800/60 bg-slate-950/25 backdrop-blur-xl sticky top-0 z-40">
       <div className="max-w-[1600px] mx-auto h-full px-6 flex items-center justify-between">
-        <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('home')}>
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/20">
-            AQ
+        <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setView('home')}>
+          <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-cyan-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-cyan-500/10 border border-indigo-400/30">
+            SP
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent leading-none mb-1">
-              AcademiaQuest
+            <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-indigo-300 via-cyan-300 to-violet-300 bg-clip-text text-transparent leading-none mb-1 font-jakarta">
+              Study Planner
             </h1>
-            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none">Neural Learning Manager</p>
+            <p className="text-[10px] font-bold text-slate-400 tracking-wider leading-none">
+              Improve productivity and focus
+            </p>
           </div>
         </div>
 
