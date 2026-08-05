@@ -71,6 +71,18 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "lastResetDate": { "type": "string", "format": "date" }
       }
+    },
+    "dailyFocusSession": {
+      "title": "Daily Focus Session",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "items": { "type": "array" },
+        "isActive": { "type": "boolean" },
+        "totalTasks": { "type": "integer" },
+        "completedTasks": { "type": "integer" }
+      },
+      "required": ["date", "items", "isActive", "totalTasks", "completedTasks"]
     }
   },
   "firestore": {
@@ -85,6 +97,10 @@
     "/users/{userId}/tasks/{taskId}": {
       "schema": "task",
       "description": "User's daily and subject-specific tasks"
+    },
+    "/users/{userId}/dailyFocusSessions/{date}": {
+      "schema": "dailyFocusSession",
+      "description": "User's daily focus sessions with staged and completed items"
     },
     "/test/{docId}": {
       "description": "System test collection"

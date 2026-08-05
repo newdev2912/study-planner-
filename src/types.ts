@@ -22,7 +22,7 @@ export interface Task {
   createdAt?: string;
   lastResetDate?: string;    // ISO date string 'YYYY-MM-DD' to handle daily resets
   taskType?: 'DAILY' | 'CODE' | 'STUDY';
-  subTasks?: { id: string; title: string; completed: boolean }[];
+  subTasks?: { id: string; title: string; completed: boolean; selected?: boolean }[];
 }
 
 export interface StudyJourney {
@@ -54,6 +54,7 @@ export interface TopicData {
   id: string;
   title: string;
   completed: boolean;
+  selected?: boolean;
 }
 
 export interface ModuleData {
@@ -84,3 +85,27 @@ export interface SubjectData {
 export interface SubjectMasteryState {
   subjects: SubjectData[];
 }
+
+export interface StagedFocusItem {
+  id: string;             // Unique identifier `${subjectId}_${moduleId}_${topicId}` or regular task id
+  subjectId: string;
+  subjectName: string;    // e.g., "Data Structures & Algorithms"
+  taskCategory: 'CODE' | 'STUDY' | 'DAILY' | string; // e.g., "CODE"
+  priority: 'high' | 'medium' | 'low' | 'on-going';
+  moduleId: string;
+  moduleName: string;     // e.g., "Module 2: Linked Lists"
+  topicId: string;
+  topicTitle: string;     // e.g., "Doubly Linked List Insertion"
+  isStaged: boolean;      // True when staged in Central Panel (Yellow check)
+  isCompleted: boolean;   // True when completed in Left Panel Session (Green check)
+  stagedAt: string;       // ISO Date timestamp
+}
+
+export interface DailyFocusSession {
+  date: string;           // Key: "YYYY-MM-DD"
+  items: StagedFocusItem[];
+  isActive: boolean;
+  totalTasks: number;
+  completedTasks: number;
+}
+

@@ -49,6 +49,11 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // DAILY FOCUS SESSIONS COLLECTION
+    match /users/{userId}/dailyFocusSessions/{date} {
+      allow read, write: if isOwner(userId);
+    }
+
     // LEGACY CLEANUP (OPTIONAL)
     match /subject_mastery/{userId} {
       allow read, write: if isOwner(userId);

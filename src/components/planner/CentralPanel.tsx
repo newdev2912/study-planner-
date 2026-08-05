@@ -832,55 +832,191 @@ export const CentralPanel = ({
                               className="bg-slate-950/40 overflow-hidden"
                             >
                               <div className="p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[8px] font-black text-purple-400 tracking-wider uppercase">SUB-TASKS / METHOD CHECKLIST</span>
-                                  <span className="text-[8px] font-bold text-slate-500">
-                                    {task.subTasks?.filter(s => s.completed).length || 0} of {task.subTasks?.length || 0} Complete
+                                <div className="flex items-center justify-between pb-1 border-b border-slate-900">
+                                  <span className="text-[8px] font-black text-purple-400 tracking-wider uppercase">
+                                    {isSubject ? "SUBJECT ROADMAP HIERARCHY" : "SUB-TASKS / METHOD CHECKLIST"}
                                   </span>
-                                </div>
-
-                                {/* Checklist items */}
-                                <div className="space-y-1.5">
-                                  {task.subTasks?.map((sub) => (
-                                    <div
-                                      key={sub.id}
-                                      onClick={() => toggleSubTask(task.id, sub.id)}
-                                      className="flex items-center gap-2 p-2 bg-slate-950/30 border border-slate-900 rounded-lg cursor-pointer hover:bg-slate-950/60 transition-colors select-none group"
-                                    >
-                                      <button className="shrink-0 text-slate-600 group-hover:text-purple-400 transition-colors">
-                                        {sub.completed ? (
-                                          <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
-                                        ) : (
-                                          <Square className="w-3.5 h-3.5" />
-                                        )}
+                                  {isSubject ? (
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => toggleSubTask(task.id, "subject-stage-all")}
+                                        className="text-[8px] font-black tracking-widest text-yellow-500 hover:text-yellow-400 uppercase cursor-pointer"
+                                      >
+                                        STAGE ALL
                                       </button>
-                                      <span className={cn(
-                                        "text-[10px] tracking-wide leading-none",
-                                        sub.completed ? "line-through text-slate-600" : "text-slate-350"
-                                      )}>
-                                        {sub.title}
-                                      </span>
+                                      <span className="text-slate-800">|</span>
+                                      <button
+                                        onClick={() => toggleSubTask(task.id, "subject-unstage-all")}
+                                        className="text-[8px] font-black tracking-widest text-slate-500 hover:text-slate-400 uppercase cursor-pointer"
+                                      >
+                                        CLEAR ALL
+                                      </button>
                                     </div>
-                                  ))}
+                                  ) : (
+                                    <span className="text-[8px] font-bold text-slate-500">
+                                      {task.subTasks?.filter(s => s.completed).length || 0} of {task.subTasks?.length || 0} Complete
+                                    </span>
+                                  )}
                                 </div>
 
-                                {/* Inline subtask add block */}
-                                <div className="flex gap-2 pt-1">
-                                  <input
-                                    type="text"
-                                    placeholder="Add sub-task checklist item..."
-                                    value={newSubTaskTitles[task.id] || ""}
-                                    onChange={(e) => setNewSubTaskTitles(prev => ({ ...prev, [task.id]: e.target.value }))}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddSubTask(task.id)}
-                                    className="flex-1 bg-slate-950 border border-slate-900 rounded-lg px-2.5 py-1 text-[10px] text-slate-300 focus:outline-none focus:border-purple-650"
-                                  />
-                                  <button
-                                    onClick={() => handleAddSubTask(task.id)}
-                                    className="px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-[8px] font-black uppercase tracking-wider"
-                                  >
-                                    Add
-                                  </button>
-                                </div>
+                                {/* Subject Staged / Module Rendering */}
+                                {isSubject ? (
+                                  <div className="space-y-4 pt-1">
+                                    {(() => {
+                                      const subId = task.id.replace("subject-", "");
+                                      const subjectObj = subjectMastery?.find(s => s.id === subId);
+                                      if (!subjectObj || !subjectObj.modules || subjectObj.modules.length === 0) {
+                                        return (
+                                          <div className="text-[10px] text-slate-500 italic py-2">
+                                            No modules defined for this subject.
+                                          </div>
+                                        );
+                                      }
+                                      return subjectObj.modules.map((m: any) => {
+                                        const allTopicsSelected = m.topics && m.topics.length > 0 && m.topics.every((t: any) => t.selected);
+                                        const anyTopicSelected = m.topics && m.topics.some((t: any) => t.selected);
+                                        return (
+                                          <div key={m.id} className="space-y-2 border-l border-slate-850 pl-3 ml-1">
+                                            {/* Module Header with Staging Checkbox */}
+                                            <div className="flex items-center justify-between py-1">
+                                              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">{m.name}</span>
+                                              <button
+                                                onClick={() => toggleSubTask(task.id, allTopicsSelected ? `module-unstage:${m.id}` : `module-stage:${m.id}`)}
+                                                className={cn(
+                                                  "text-[8px] font-black tracking-wider px-2 py-0.5 rounded border transition-all flex items-center gap-1 cursor-pointer",
+                                                  allTopicsSelected
+                                                    ? "bg-yellow-400/10 border-yellow-400/50 text-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.15)]"
+                                                    : anyTopicSelected
+                                                    ? "bg-slate-900/40 border-slate-700 text-yellow-300 border-dashed"
+                                                    : "bg-slate-950/40 border-slate-900 text-slate-500 hover:border-slate-700 hover:text-slate-400"
+                                                )}
+                                              >
+                                                {allTopicsSelected ? (
+                                                  <>
+                                                    <Check className="w-2.5 h-2.5 text-yellow-400 stroke-[3]" />
+                                                    STAGED
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Square className="w-2.5 h-2.5" />
+                                                    STAGE MODULE
+                                                  </>
+                                                )}
+                                              </button>
+                                            </div>
+
+                                            {/* Topics List */}
+                                            <div className="space-y-1.5 pl-1">
+                                              {m.topics?.map((topic: any) => {
+                                                const isTopicSelected = topic.selected || false;
+                                                const isTopicCompleted = topic.completed || false;
+                                                return (
+                                                  <div
+                                                    key={topic.id}
+                                                    onClick={() => toggleSubTask(task.id, topic.id)}
+                                                    className={cn(
+                                                      "flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-all border select-none group",
+                                                      isTopicCompleted
+                                                        ? "bg-emerald-500/5 border-emerald-500/10 hover:bg-emerald-500/15"
+                                                        : isTopicSelected
+                                                        ? "bg-yellow-400/5 border-yellow-400/20 hover:bg-yellow-400/10"
+                                                        : "bg-slate-950/20 border-slate-900/60 hover:bg-slate-950/40"
+                                                    )}
+                                                  >
+                                                    <div className={cn(
+                                                      "w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0",
+                                                      isTopicCompleted
+                                                        ? "bg-emerald-500/10 border-emerald-500"
+                                                        : isTopicSelected
+                                                        ? "bg-yellow-400/10 border-yellow-400"
+                                                        : "bg-slate-900/40 border-slate-700"
+                                                    )}>
+                                                      {isTopicCompleted ? (
+                                                        <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />
+                                                      ) : isTopicSelected ? (
+                                                        <Check className="w-3 h-3 text-yellow-400 stroke-[3]" />
+                                                      ) : null}
+                                                    </div>
+                                                    <span className={cn(
+                                                      "text-[10px] tracking-wide transition-colors",
+                                                      isTopicCompleted
+                                                        ? "line-through text-slate-500"
+                                                        : isTopicSelected
+                                                        ? "text-slate-200 font-semibold"
+                                                        : "text-slate-400 group-hover:text-slate-300"
+                                                    )}>
+                                                      {topic.title}
+                                                    </span>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+                                ) : (
+                                  /* Standard Checklist Items */
+                                  <div className="space-y-1.5">
+                                    {task.subTasks?.map((sub) => (
+                                      <div
+                                        key={sub.id}
+                                        onClick={() => toggleSubTask(task.id, sub.id)}
+                                        className={cn(
+                                          "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors border select-none group",
+                                          sub.completed
+                                            ? "bg-emerald-500/5 border-emerald-500/10"
+                                            : sub.selected
+                                            ? "bg-yellow-400/5 border-yellow-400/20"
+                                            : "bg-slate-950/30 border-slate-900"
+                                        )}
+                                      >
+                                        <div className={cn(
+                                          "w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0",
+                                          sub.completed
+                                            ? "bg-emerald-500/10 border-emerald-500"
+                                            : sub.selected
+                                            ? "bg-yellow-400/10 border-yellow-400"
+                                            : "bg-slate-900/40 border-slate-700"
+                                        )}>
+                                          {sub.completed ? (
+                                            <Check className="w-3 h-3 text-emerald-400 stroke-[3]" />
+                                          ) : sub.selected ? (
+                                            <Check className="w-3 h-3 text-yellow-400 stroke-[3]" />
+                                          ) : null}
+                                        </div>
+                                        <span className={cn(
+                                          "text-[10px] tracking-wide leading-none transition-colors",
+                                          sub.completed ? "line-through text-slate-500" : "text-slate-350",
+                                          sub.selected && !sub.completed && "text-yellow-300 font-medium"
+                                        )}>
+                                          {sub.title}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Inline subtask add block (only for non-subjects) */}
+                                {!isSubject && (
+                                  <div className="flex gap-2 pt-1">
+                                    <input
+                                      type="text"
+                                      placeholder="Add sub-task checklist item..."
+                                      value={newSubTaskTitles[task.id] || ""}
+                                      onChange={(e) => setNewSubTaskTitles(prev => ({ ...prev, [task.id]: e.target.value }))}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleAddSubTask(task.id)}
+                                      className="flex-1 bg-slate-950 border border-slate-900 rounded-lg px-2.5 py-1 text-[10px] text-slate-300 focus:outline-none focus:border-purple-650"
+                                    />
+                                    <button
+                                      onClick={() => handleAddSubTask(task.id)}
+                                      className="px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-[8px] font-black uppercase tracking-wider"
+                                    >
+                                      Add
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </motion.div>
                           )}

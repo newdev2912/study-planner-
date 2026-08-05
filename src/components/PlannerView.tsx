@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StudyJourney, UserStats, SubjectData, Task } from '../types';
+import { StudyJourney, UserStats, SubjectData, Task, StagedFocusItem } from '../types';
 import { TopPanel } from './planner/TopPanel';
 import { LeftPanel } from './planner/LeftPanel';
 import { CentralPanel } from './planner/CentralPanel';
@@ -36,6 +36,28 @@ export const PlannerView = ({
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [activeSessionTaskIds, setActiveSessionTaskIds] = useState<string[]>([]);
   const [activeSessionActive, setActiveSessionActive] = useState<boolean>(false);
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+
+  // Real-time Firestore session sync subscription
+  useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    let unsubscribe = () => {};
+    
+    import('../lib/firebase/session').then(mod => {
+      unsubscribe = mod.listenToDailySession(todayStr, (session) => {
+        setActiveSession(session);
+        if (session && session.isActive) {
+          setActiveSessionActive(true);
+        } else {
+          setActiveSessionActive(false);
+        }
+      });
+    }).catch(console.error);
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
 
   // Auto-enrich journey daily_tasks with taskType & subTasks if missing
   useEffect(() => {
@@ -92,25 +114,59 @@ export const PlannerView = ({
     }
   }, [journey.daily_tasks, setJourney]);
 
-  // Handle toggling subtasks from Left Panel or Central Panel Detail Deck (unified)
-  const handleToggleSubTask = (taskId: string, subTaskId: string) => {
+  // Handle toggling subtasks selection from Central Panel (staged for today)
+  const handleToggleSubTaskSelection = (taskId: string, subTaskId: string) => {
     if (taskId.startsWith("subject-")) {
       const subjectId = taskId.replace("subject-", "");
       const updated = subjectMastery.map(s => {
         if (s.id === subjectId) {
-          const nextSub = {
-            ...s,
-            modules: s.modules.map(m => {
+          let nextSub = { ...s };
+
+          if (subTaskId === "subject-stage-all") {
+            nextSub.modules = s.modules.map(m => ({
+              ...m,
+              topics: m.topics.map(t => ({ ...t, selected: true }))
+            }));
+          } else if (subTaskId === "subject-unstage-all") {
+            nextSub.modules = s.modules.map(m => ({
+              ...m,
+              topics: m.topics.map(t => ({ ...t, selected: false }))
+            }));
+          } else if (subTaskId.startsWith("module-stage:")) {
+            const modId = subTaskId.replace("module-stage:", "");
+            nextSub.modules = s.modules.map(m => {
+              if (m.id === modId) {
+                return {
+                  ...m,
+                  topics: m.topics.map(t => ({ ...t, selected: true }))
+                };
+              }
+              return m;
+            });
+          } else if (subTaskId.startsWith("module-unstage:")) {
+            const modId = subTaskId.replace("module-unstage:", "");
+            nextSub.modules = s.modules.map(m => {
+              if (m.id === modId) {
+                return {
+                  ...m,
+                  topics: m.topics.map(t => ({ ...t, selected: false }))
+                };
+              }
+              return m;
+            });
+          } else {
+            nextSub.modules = s.modules.map(m => {
               const updatedTopics = m.topics.map(topic => {
                 const matches = subTaskId.includes(topic.id) || subTaskId.endsWith(topic.title.replace(/\s+/g, '-'));
                 if (matches || topic.id === subTaskId) {
-                  return { ...topic, completed: !topic.completed };
+                  return { ...topic, selected: !topic.selected };
                 }
                 return topic;
               });
               return { ...m, topics: updatedTopics };
-            })
-          };
+            });
+          }
+
           // Sync to Firebase!
           import('../lib/firebase/subjects').then(mod => {
             mod.syncSubjectToFirebase(nextSub);
@@ -120,6 +176,14 @@ export const PlannerView = ({
         return s;
       });
       setSubjectMastery(updated);
+
+      // Automatically add to selectedTaskIds if any subtopic is selected
+      const hasAnySelected = updated.find(s => s.id === subjectId)?.modules.some(m => m.topics.some(t => t.selected)) || false;
+      if (hasAnySelected) {
+        setSelectedTaskIds(prev => prev.includes(taskId) ? prev : [...prev, taskId]);
+      } else {
+        setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+      }
       return;
     }
 
@@ -130,7 +194,122 @@ export const PlannerView = ({
         if (task) {
           const updatedSubTasks = task.subTasks?.map(st => {
             if (st.id === subTaskId) {
-              return { ...st, completed: !st.completed };
+              return { ...st, selected: !st.selected };
+            }
+            return st;
+          }) || [];
+          const updatedTask = {
+            ...task,
+            subTasks: updatedSubTasks
+          };
+          // Sync to Firebase
+          import('../lib/firebase/tasks').then(mod => {
+            mod.syncTaskToFirebase(updatedTask);
+          }).catch(console.error);
+
+          const hasAnySelected = updatedSubTasks.some(st => st.selected);
+          if (hasAnySelected) {
+            setSelectedTaskIds(prev => prev.includes(taskId) ? prev : [...prev, taskId]);
+          } else {
+            setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+          }
+        }
+      }
+    }
+
+    setJourney(prev => {
+      const updatedTasks = prev.daily_tasks.map(t => {
+        if (t.id !== taskId) return t;
+
+        const subTasks = t.subTasks?.map(st => {
+          if (st.id === subTaskId) {
+            return { ...st, selected: !st.selected };
+          }
+          return st;
+        }) || [];
+
+        const hasAnySelected = subTasks.some(st => st.selected);
+        if (hasAnySelected) {
+          setSelectedTaskIds(prev => prev.includes(taskId) ? prev : [...prev, taskId]);
+        } else {
+          setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+        }
+
+        return {
+          ...t,
+          subTasks
+        };
+      });
+
+      return {
+        ...prev,
+        daily_tasks: updatedTasks
+      };
+    });
+  };
+
+  // Handle toggling subtasks completion from Left Panel (active checklist checkoff)
+  const handleToggleSubTaskCompletion = async (taskId: string, subTaskId: string) => {
+    // If it's a composite staged item ID or normal
+    const itemId = taskId.includes('_') ? taskId : `${taskId}_${subTaskId}`;
+    
+    // First update firestore and local sync
+    const todayStr = new Date().toISOString().split('T')[0];
+    const currentItem = activeSession?.items?.find((i: any) => i.id === itemId);
+    const nextCompletedState = currentItem ? !currentItem.isCompleted : true;
+
+    const { toggleCompletedStagedItem } = await import('../lib/firebase/session');
+    await toggleCompletedStagedItem(todayStr, itemId, nextCompletedState);
+
+    // Sync back to subjectMastery local state & Firebase
+    if (taskId.startsWith("subject-") || itemId.split('_').length === 3) {
+      const parts = itemId.split('_');
+      const subId = parts[0] || taskId.replace("subject-", "");
+      const modId = parts[1] || "";
+      const topId = parts[2] || subTaskId;
+
+      const updated = subjectMastery.map(s => {
+        if (s.id === subId) {
+          return {
+            ...s,
+            modules: s.modules.map(m => {
+              if (m.id === modId || modId === "") {
+                return {
+                  ...m,
+                  topics: m.topics.map(topic => {
+                    if (topic.id === topId || topic.title === subTaskId) {
+                      return { ...topic, completed: nextCompletedState };
+                    }
+                    return topic;
+                  })
+                };
+              }
+              return m;
+            })
+          };
+        }
+        return s;
+      });
+      setSubjectMastery(updated);
+      const updatedSub = updated.find(s => s.id === subId);
+      if (updatedSub) {
+        const mod = await import('../lib/firebase/subjects');
+        await mod.syncSubjectToFirebase(updatedSub);
+      }
+      return;
+    }
+
+    // Sync back to regular tasks
+    const realTaskId = taskId.includes('_') ? taskId.split('_')[0] : taskId;
+    const realSubTaskId = taskId.includes('_') ? taskId.split('_')[1] : subTaskId;
+
+    if (realTaskId.startsWith("task-")) {
+      if (tasks) {
+        const task = tasks.find(t => t.id === realTaskId);
+        if (task) {
+          const updatedSubTasks = task.subTasks?.map(st => {
+            if (st.id === realSubTaskId) {
+              return { ...st, completed: nextCompletedState };
             }
             return st;
           }) || [];
@@ -150,12 +329,11 @@ export const PlannerView = ({
 
     setJourney(prev => {
       const updatedTasks = prev.daily_tasks.map(t => {
-        if (t.id !== taskId) return t;
+        if (t.id !== realTaskId) return t;
 
         const subTasks = t.subTasks?.map(st => {
-          if (st.id === subTaskId) {
-            const nextCompleted = !st.completed;
-            return { ...st, completed: nextCompleted };
+          if (st.id === realSubTaskId) {
+            return { ...st, completed: nextCompletedState };
           }
           return st;
         }) || [];
@@ -197,8 +375,64 @@ export const PlannerView = ({
     });
   };
 
-  const handleStartSession = () => {
-    setActiveSessionTaskIds(selectedTaskIds);
+  const handleStartSession = async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const stagedItems: StagedFocusItem[] = [];
+
+    // Compile from subjectMastery
+    subjectMastery.forEach(s => {
+      s.modules.forEach(m => {
+        m.topics.forEach((topic) => {
+          if (topic.selected) {
+            stagedItems.push({
+              id: `${s.id}_${m.id}_${topic.id}`,
+              subjectId: s.id,
+              subjectName: s.name,
+              taskCategory: s.taskType || 'STUDY',
+              priority: s.priority || 'low',
+              moduleId: m.id,
+              moduleName: m.name,
+              topicId: topic.id,
+              topicTitle: topic.title,
+              isStaged: true,
+              isCompleted: topic.completed,
+              stagedAt: new Date().toISOString()
+            });
+          }
+        });
+      });
+    });
+
+    // Compile from regular tasks
+    const combinedTasks = [...(tasks || []), ...journey.daily_tasks];
+    const processedTaskIds = new Set<string>();
+    combinedTasks.forEach(t => {
+      if (processedTaskIds.has(t.id)) return;
+      processedTaskIds.add(t.id);
+
+      t.subTasks?.forEach(st => {
+        if (st.selected) {
+          stagedItems.push({
+            id: `${t.id}_${st.id}`,
+            subjectId: t.id,
+            subjectName: t.subject,
+            taskCategory: t.taskType || 'DAILY',
+            priority: t.priority || 'low',
+            moduleId: t.id,
+            moduleName: t.task_title,
+            topicId: st.id,
+            topicTitle: st.title,
+            isStaged: true,
+            isCompleted: st.completed,
+            stagedAt: new Date().toISOString()
+          });
+        }
+      });
+    });
+
+    // Commit to Firestore
+    const { commitDailySession } = await import('../lib/firebase/session');
+    await commitDailySession(todayStr, stagedItems);
     setActiveSessionActive(true);
   };
 
@@ -212,7 +446,11 @@ export const PlannerView = ({
         if (!list.some(item => item.id === t.id)) {
           list.push({
             ...t,
-            taskType: t.taskType || 'DAILY'
+            taskType: t.taskType || 'DAILY',
+            subTasks: t.subTasks?.map(st => ({
+              ...st,
+              selected: st.selected || false
+            }))
           });
         }
       });
@@ -237,7 +475,8 @@ export const PlannerView = ({
               (m.topics || []).map((topic, tIdx) => ({
                 id: `sub-topic-${s.id}-${mIdx}-${tIdx}`,
                 title: `${m.name}: ${topic.title}`,
-                completed: topic.completed
+                completed: topic.completed,
+                selected: topic.selected || false
               }))
             )
           });
@@ -249,10 +488,14 @@ export const PlannerView = ({
   };
 
   const unifiedTasks = getUnifiedTasks();
-  const activeSessionTasks = unifiedTasks.filter(t => activeSessionTaskIds.includes(t.id));
+  // Filter active session tasks to only include those in activeSessionTaskIds AND which have selected subtasks
+  const activeSessionTasks = unifiedTasks.filter(t => 
+    activeSessionTaskIds.includes(t.id) && 
+    t.subTasks && t.subTasks.some(st => st.selected)
+  );
   
-  const totalSubTasks = activeSessionTasks.reduce((acc, t) => acc + (t.subTasks?.length || 0), 0);
-  const completedSubTasks = activeSessionTasks.reduce((acc, t) => acc + (t.subTasks?.filter(st => st.completed).length || 0), 0);
+  const totalSubTasks = activeSessionTasks.reduce((acc, t) => acc + (t.subTasks?.filter(st => st.selected).length || 0), 0);
+  const completedSubTasks = activeSessionTasks.reduce((acc, t) => acc + (t.subTasks?.filter(st => st.selected && st.completed).length || 0), 0);
   const activeSessionProgress = totalSubTasks > 0 ? (completedSubTasks / totalSubTasks) * 100 : 0;
 
   return (
@@ -261,8 +504,9 @@ export const PlannerView = ({
       <TopPanel
         journeyTitle={journey.journey_title}
         activeSessionTasks={activeSessionTasks}
-        completionPercentage={activeSessionProgress}
+        completionPercentage={activeSession ? (activeSession.totalTasks > 0 ? (activeSession.completedTasks / activeSession.totalTasks) * 100 : 0) : activeSessionProgress}
         setView={setView}
+        activeSession={activeSession}
       />
 
       {/* Main workspace layout grid: Left, Central, and Right Panels */}
@@ -272,7 +516,8 @@ export const PlannerView = ({
           <LeftPanel
             activeSessionTasks={activeSessionTasks}
             activeSessionActive={activeSessionActive}
-            onToggleSubTask={handleToggleSubTask}
+            onToggleSubTask={handleToggleSubTaskCompletion}
+            activeSession={activeSession}
           />
         </div>
 
@@ -290,13 +535,18 @@ export const PlannerView = ({
             onStartSession={handleStartSession}
             tasks={tasks}
             subjectMastery={subjectMastery}
-            onToggleSubTask={handleToggleSubTask}
+            onToggleSubTask={handleToggleSubTaskSelection}
           />
         </div>
 
         {/* Right Column: Reserved Utility Bay (3/12 width) */}
         <div className="col-span-12 md:col-span-3 h-full min-h-0">
-          <RightPanel />
+          <RightPanel 
+            activeSession={activeSession}
+            activeSessionTasks={activeSessionTasks}
+            onToggleSubTask={handleToggleSubTaskCompletion}
+            stats={stats}
+          />
         </div>
       </div>
     </div>
