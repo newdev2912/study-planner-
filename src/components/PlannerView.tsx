@@ -45,11 +45,9 @@ export const PlannerView = ({
     
     import('../lib/firebase/session').then(mod => {
       unsubscribe = mod.listenToDailySession(todayStr, (session) => {
-        setActiveSession(session);
-        if (session && session.isActive) {
-          setActiveSessionActive(true);
-        } else {
-          setActiveSessionActive(false);
+        if (session) {
+          setActiveSession(session);
+          setActiveSessionActive(session.isActive);
         }
       });
     }).catch(console.error);
@@ -564,12 +562,91 @@ export const PlannerView = ({
       }
     });
 
+    // If stagedItems is still empty (e.g., stale selected IDs or no active selection matched),
+    // force populate ALL subjects and tasks so clicking POPULATE & START SESSION never leaves session empty!
+    if (stagedItems.length === 0) {
+      currentSubjects.forEach(s => {
+        s.modules.forEach(m => {
+          m.topics.forEach((topic) => {
+            stagedItems.push({
+              id: `${s.id}_${m.id}_${topic.id}`,
+              subjectId: s.id,
+              subjectName: s.name,
+              taskCategory: s.taskType || 'STUDY',
+              priority: s.priority || 'low',
+              moduleId: m.id,
+              moduleName: m.name,
+              topicId: topic.id,
+              topicTitle: topic.title,
+              isStaged: true,
+              isCompleted: topic.completed,
+              stagedAt: new Date().toISOString()
+            });
+            if (!newActiveTaskIds.includes(`subject-${s.id}`)) {
+              newActiveTaskIds.push(`subject-${s.id}`);
+            }
+          });
+        });
+      });
+
+      combinedTasks.forEach(t => {
+        if (t.subTasks && t.subTasks.length > 0) {
+          t.subTasks.forEach(st => {
+            stagedItems.push({
+              id: `${t.id}_${st.id}`,
+              subjectId: t.id,
+              subjectName: t.subject || 'General',
+              taskCategory: t.taskType || 'DAILY',
+              priority: t.priority || 'low',
+              moduleId: t.id,
+              moduleName: t.task_title,
+              topicId: st.id,
+              topicTitle: st.title,
+              isStaged: true,
+              isCompleted: st.completed,
+              stagedAt: new Date().toISOString()
+            });
+          });
+        } else {
+          stagedItems.push({
+            id: `${t.id}_default`,
+            subjectId: t.id,
+            subjectName: t.subject || 'General',
+            taskCategory: t.taskType || 'DAILY',
+            priority: t.priority || 'low',
+            moduleId: t.id,
+            moduleName: t.task_title,
+            topicId: 'default',
+            topicTitle: t.task_title,
+            isStaged: true,
+            isCompleted: t.completed,
+            stagedAt: new Date().toISOString()
+          });
+        }
+        if (!newActiveTaskIds.includes(t.id)) {
+          newActiveTaskIds.push(t.id);
+        }
+      });
+    }
+
     setActiveSessionTaskIds(newActiveTaskIds);
 
-    // Commit to Firestore
-    const { commitDailySession } = await import('../lib/firebase/session');
-    await commitDailySession(todayStr, stagedItems);
-    setActiveSessionActive(true);
+    // Optimistic local state update so UI updates immediately even before network roundtrip
+    const totalTasks = stagedItems.length;
+    const completedTasks = stagedItems.filter(i => i.isCompleted).length;
+    setActiveSession({
+      date: todayStr,
+      items: stagedItems,
+      isActive: totalTasks > 0,
+      totalTasks,
+      completedTasks
+    });
+    setActiveSessionActive(totalTasks > 0);
+
+    // Commit to Firestore asynchronously
+    import('../lib/firebase/session').then(({ commitDailySession }) => {
+      commitDailySession(todayStr, stagedItems).catch(console.error);
+    }).catch(console.error);
   };
 
   // Unified task compile helper

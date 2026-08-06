@@ -1,5 +1,5 @@
 import { db, auth, OperationType, handleFirestoreError } from '../firebase';
-import { doc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { DailyFocusSession, StagedFocusItem } from '../../types';
 
 // Commit/overwrite daily focus session inside users/{userId}/dailyFocusSessions/{date}
@@ -42,34 +42,27 @@ export const toggleCompletedStagedItem = async (
   const path = `users/${userId}/dailyFocusSessions/${date}`;
   try {
     const sessionRef = doc(db, path);
-    // Fetch and update the item inside the array
-    // To handle array update safely with onSnapshot, we first obtain or rely on snapshot,
-    // or run a quick transaction/update. Since it's a small app, we can perform a transaction/update:
-    // We will do a local read-then-write or update with standard fetch.
-    // However, to prevent complex race conditions, we can update the items list.
-    // Let's use a Firestore transaction or dynamic path update. Let's do a transaction:
-    const { runTransaction } = await import('firebase/firestore');
-    await runTransaction(db, async (transaction) => {
-      const sfDoc = await transaction.get(sessionRef);
-      if (!sfDoc.exists()) return;
+    const snapshot = await getDoc(sessionRef);
+    if (!snapshot.exists()) return;
 
-      const data = sfDoc.data() as DailyFocusSession;
-      const updatedItems = data.items.map(item => {
-        if (item.id === itemId) {
-          return { ...item, isCompleted: completed };
-        }
-        return item;
-      });
-
-      const totalTasks = updatedItems.length;
-      const completedTasks = updatedItems.filter(i => i.isCompleted).length;
-
-      transaction.update(sessionRef, {
-        items: updatedItems,
-        totalTasks,
-        completedTasks
-      });
+    const data = snapshot.data() as DailyFocusSession;
+    const updatedItems = (data.items || []).map(item => {
+      if (item.id === itemId) {
+        return { ...item, isCompleted: completed };
+      }
+      return item;
     });
+
+    const totalTasks = updatedItems.length;
+    const completedTasks = updatedItems.filter(i => i.isCompleted).length;
+
+    await setDoc(sessionRef, {
+      items: updatedItems,
+      totalTasks,
+      completedTasks,
+      date,
+      isActive: totalTasks > 0
+    }, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
