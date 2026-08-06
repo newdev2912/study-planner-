@@ -1,11 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup,
   AuthError
 } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, googleProvider, db } from '../lib/firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, LogIn, UserPlus, Chrome, AlertCircle, User, Flame, Sparkles, ShieldCheck, Zap, PawPrint } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -95,6 +96,7 @@ const LOGIN_THEMES: Record<LoginThemeKey, LoginThemeConfig> = {
 
 export const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -107,16 +109,27 @@ export const AuthPage = () => {
   
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  const [recentAccounts, setRecentAccounts] = useState<string[]>(() => {
-    const saved = localStorage.getItem('academia_recent_accounts');
-    return saved ? JSON.parse(saved) : ['student@academia.edu', 'cyber.scholar@quest.io'];
-  });
+  const [firebaseUsers, setFirebaseUsers] = useState<{ name: string; email: string }[]>([]);
 
-  const saveRecentAccount = (email: string) => {
-    const updated = [email, ...recentAccounts.filter(a => a !== email)].slice(0, 3);
-    setRecentAccounts(updated);
-    localStorage.setItem('academia_recent_accounts', JSON.stringify(updated));
+  const fetchUsers = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'public_users'));
+      const usersList: { name: string; email: string }[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.name && data.email) {
+          usersList.push({ name: data.name, email: data.email });
+        }
+      });
+      setFirebaseUsers(usersList);
+    } catch (err) {
+      console.error("Error fetching public users:", err);
+    }
   };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,10 +139,31 @@ export const AuthPage = () => {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        saveRecentAccount(email);
+        const user = auth.currentUser;
+        if (user && name) {
+          await setDoc(doc(db, 'public_users', user.uid), {
+            name: name,
+            email: email,
+            uid: user.uid,
+            createdAt: new Date().toISOString()
+          }, { merge: true });
+        }
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-        saveRecentAccount(email);
+        if (!name.trim()) {
+          setError("Name is required to create a profile.");
+          setLoading(false);
+          return;
+        }
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        if (userCredential.user) {
+          const userId = userCredential.user.uid;
+          await setDoc(doc(db, 'public_users', userId), {
+            name: name.trim(),
+            email: email,
+            uid: userId,
+            createdAt: new Date().toISOString()
+          });
+        }
       }
     } catch (err) {
       const authError = err as AuthError;
@@ -144,7 +178,16 @@ export const AuthPage = () => {
     setError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      if (result.user.email) saveRecentAccount(result.user.email);
+      if (result.user.email) {
+        const userId = result.user.uid;
+        const profileName = result.user.displayName || result.user.email.split('@')[0];
+        await setDoc(doc(db, 'public_users', userId), {
+          name: profileName,
+          email: result.user.email,
+          uid: userId,
+          createdAt: new Date().toISOString()
+        }, { merge: true });
+      }
     } catch (err) {
       const authError = err as AuthError;
       setError(authError.message);
@@ -153,8 +196,9 @@ export const AuthPage = () => {
     }
   };
 
-  const selectRecentAccount = (email: string) => {
-    setEmail(email);
+  const selectRecentAccount = (preset: { name: string; email: string }) => {
+    setEmail(preset.email);
+    setName(preset.name);
     setIsLogin(true);
     setTimeout(() => {
       passwordInputRef.current?.focus();
@@ -246,7 +290,7 @@ export const AuthPage = () => {
           </div>
 
           {/* Quick Preset Accounts */}
-          {isLogin && recentAccounts.length > 0 && (
+          {isLogin && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5 px-0.5">
                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
@@ -255,26 +299,38 @@ export const AuthPage = () => {
                 </span>
                 <span className="text-[8px] font-mono text-slate-500">CLICK TO FILL</span>
               </div>
-              <div className="grid grid-cols-1 gap-1.5">
-                {recentAccounts.map((accEmail) => (
-                  <button
-                    key={accEmail}
-                    type="button"
-                    onClick={() => selectRecentAccount(accEmail)}
-                    className="w-full bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800/80 hover:border-slate-700 transition-all p-2 rounded-lg flex items-center justify-between text-left group cursor-pointer active:scale-98"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className={cn("w-6 h-6 rounded-md flex items-center justify-center border transition-all shrink-0", activeTheme.glowBg, activeTheme.border)}>
-                        <User className={cn("w-3 h-3", activeTheme.textColor)} />
+              {firebaseUsers.length > 0 ? (
+                <div className="grid grid-cols-1 gap-1.5">
+                  {firebaseUsers.slice(0, 3).map((userObj) => (
+                    <button
+                      key={userObj.email}
+                      type="button"
+                      onClick={() => selectRecentAccount(userObj)}
+                      className="w-full bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800/80 hover:border-slate-700 transition-all p-2 rounded-lg flex items-center justify-between text-left group cursor-pointer active:scale-98"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={cn("w-6 h-6 rounded-md flex items-center justify-center border transition-all shrink-0", activeTheme.glowBg, activeTheme.border)}>
+                          <User className={cn("w-3 h-3", activeTheme.textColor)} />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[11px] font-extrabold text-slate-200 truncate group-hover:text-white transition-colors leading-tight">
+                            {userObj.name}
+                          </span>
+                          <span className="text-[9px] text-slate-500 truncate">
+                            {userObj.email}
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-200 truncate group-hover:text-white transition-colors">
-                        {accEmail}
-                      </span>
-                    </div>
-                    <LogIn className={cn("w-3 h-3 text-slate-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1.5", `group-hover:${activeTheme.textColor}`)} />
-                  </button>
-                ))}
-              </div>
+                      <LogIn className={cn("w-3 h-3 text-slate-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-1.5", `group-hover:${activeTheme.textColor}`)} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-3.5 bg-slate-950/50 border border-slate-800/60 rounded-xl">
+                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">No presets available</p>
+                  <p className="text-[9px] text-slate-500 mt-1">Sign Up to create a profile and see yourself here!</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -310,6 +366,21 @@ export const AuthPage = () => {
 
           {/* Auth Form */}
           <form onSubmit={handleAuth} className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-0.5">Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                <input 
+                  type="text"
+                  required={!isLogin}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-slate-950/90 border border-slate-800 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 text-slate-100 rounded-xl pl-9 pr-3 py-2 outline-none transition-all text-xs font-medium placeholder:text-slate-600"
+                  placeholder="Alex Mercer"
+                />
+              </div>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-0.5">Email Address</label>
               <div className="relative">

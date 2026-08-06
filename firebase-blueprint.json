@@ -83,9 +83,24 @@
         "completedTasks": { "type": "integer" }
       },
       "required": ["date", "items", "isActive", "totalTasks", "completedTasks"]
+    },
+    "publicUser": {
+      "title": "Public User Profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email"]
     }
   },
   "firestore": {
+    "/public_users/{userId}": {
+      "schema": "publicUser",
+      "description": "Public user info for quick login preset cards"
+    },
     "/users/{userId}": {
       "schema": "stats",
       "description": "User's overall statistics and metadata"

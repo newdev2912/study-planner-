@@ -81,84 +81,97 @@ async function startServer() {
 
   // Main Chat API Route using Local Ollama (llama3.2)
   app.post("/api/chat", async (req, res) => {
-  try {
-    const { message, history } = req.body;
+    try {
+      // Gracefully handle different payload formats from frontend (message, prompt, or messages array)
+      let userMessage = req.body.message || req.body.prompt;
+      let history = req.body.history || [];
 
-    if (!message) {
-      return res.status(400).json({ error: "Message prompt is required." });
-    }
-
-    const rawOllamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    const ollamaBaseUrl = rawOllamaUrl.replace(/\/$/, "");
-
-    const messages = [
-      { role: "system", content: SYSTEM_INSTRUCTION },
-      ...(history || []),
-      { role: "user", content: message }
-    ];
-
-    const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
-      },
-      body: JSON.stringify({
-        model: "llama3.2",
-        messages: messages,
-        stream: true, // Enable streaming from Ollama!
-        options: {
-          temperature: 0.7,
-          num_predict: 512,
-        }
-      })
-    });
-
-    if (!response.ok || !response.body) {
-      const errorText = await response.text();
-      throw new Error(`Ollama status ${response.status}: ${errorText}`);
-    }
-
-    // Set SSE headers so client knows text is streaming live
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n").filter(Boolean);
-
-      for (const line of lines) {
-        try {
-          const parsed = JSON.parse(line);
-          const content = parsed.message?.content || "";
-          if (content) {
-            // Send each token chunk as an SSE event line
-            res.write(`data: ${JSON.stringify({ content })}\n\n`);
-          }
-        } catch (e) {
-          // Skip invalid chunk boundaries
+      if (!userMessage && Array.isArray(req.body.messages)) {
+        const incomingMessages = req.body.messages;
+        const lastMsg = incomingMessages[incomingMessages.length - 1];
+        if (lastMsg && (lastMsg.content || lastMsg.text)) {
+          userMessage = lastMsg.content || lastMsg.text;
+          history = incomingMessages.slice(0, -1).map((m: any) => ({
+            role: m.role === 'assistant' || m.role === 'ai' ? 'assistant' : 'user',
+            content: m.content || m.text || ''
+          }));
         }
       }
-    }
 
-    res.write("data: [DONE]\n\n");
-    res.end();
-  } catch (error: any) {
-    console.error("Ollama Streaming Error:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Failed to stream from local Ollama model." });
-    } else {
+      if (!userMessage) {
+        return res.status(400).json({ error: "Message prompt is required." });
+      }
+
+      const rawOllamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
+      const ollamaBaseUrl = rawOllamaUrl.replace(/\/$/, "");
+
+      const messages = [
+        { role: "system", content: SYSTEM_INSTRUCTION },
+        ...history,
+        { role: "user", content: userMessage }
+      ];
+
+      const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({
+          model: "llama3.2",
+          messages: messages,
+          stream: true,
+          options: {
+            temperature: 0.7,
+            num_predict: 512,
+          }
+        })
+      });
+
+      if (!response.ok || !response.body) {
+        const errorText = await response.text();
+        throw new Error(`Ollama status ${response.status}: ${errorText}`);
+      }
+
+      // Set SSE headers so client knows text is streaming live
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(Boolean);
+
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+            const content = parsed.message?.content || "";
+            if (content) {
+              res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            }
+          } catch (e) {
+            // Skip invalid chunk boundaries
+          }
+        }
+      }
+
+      res.write("data: [DONE]\n\n");
       res.end();
+    } catch (error: any) {
+      console.error("Ollama Streaming Error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to stream from local Ollama model." });
+      } else {
+        res.end();
+      }
     }
-  }
-});
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

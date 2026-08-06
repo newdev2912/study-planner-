@@ -39,6 +39,12 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // PUBLIC USER PROFILES
+    match /public_users/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+    }
+
     // JOURNEYS COLLECTION
     match /journeys/{userId} {
       allow read, write: if isOwner(userId);
