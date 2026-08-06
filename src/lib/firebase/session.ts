@@ -80,26 +80,44 @@ export const listenToDailySession = (
   date: string,
   onUpdate: (session: DailyFocusSession | null) => void
 ): (() => void) => {
-  const userId = auth.currentUser?.uid;
-  if (!userId) {
-    onUpdate(null);
-    return () => {};
-  }
+  let unsubscribeSnapshot: (() => void) | null = null;
 
-  const path = `users/${userId}/dailyFocusSessions/${date}`;
-  const sessionRef = doc(db, path);
+  const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
 
-  return onSnapshot(
-    sessionRef,
-    (snapshot) => {
-      if (snapshot.exists()) {
-        onUpdate(snapshot.data() as DailyFocusSession);
-      } else {
+    if (!user) {
+      onUpdate(null);
+      return;
+    }
+
+    const path = `users/${user.uid}/dailyFocusSessions/${date}`;
+    const sessionRef = doc(db, path);
+
+    unsubscribeSnapshot = onSnapshot(
+      sessionRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data() as DailyFocusSession);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (error) => {
+        if (error.code === 'permission-denied') {
+          console.warn("Daily focus session listener permission pending auth sync.");
+        } else {
+          console.error("Error listening to daily focus session:", error);
+        }
         onUpdate(null);
       }
-    },
-    (error) => {
-      console.error("Error listening to daily focus session:", error);
-    }
-  );
+    );
+  });
+
+  return () => {
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    unsubscribeAuth();
+  };
 };

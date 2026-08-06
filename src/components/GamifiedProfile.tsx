@@ -146,11 +146,23 @@ export const GamifiedProfile = ({ stats, journey, level, levelProgress }: Gamifi
 
   // Subscribe to real-time Firebase Firestore Daily Logs & Sessions for historical telemetry
   useEffect(() => {
-    let unsubscribeLogs: () => void;
-    let unsubscribeSessions: () => void;
+    let unsubscribeLogs: (() => void) | null = null;
+    let unsubscribeSessions: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) return;
+      if (unsubscribeLogs) {
+        unsubscribeLogs();
+        unsubscribeLogs = null;
+      }
+      if (unsubscribeSessions) {
+        unsubscribeSessions();
+        unsubscribeSessions = null;
+      }
+
+      if (!user) {
+        setDailyLogsMap({});
+        return;
+      }
 
       const userId = user.uid;
 
@@ -175,7 +187,7 @@ export const GamifiedProfile = ({ stats, journey, level, levelProgress }: Gamifi
               hasDeadline: data.hasDeadline || false
             };
           });
-          setDailyLogsMap(prev => ({ ...prev, ...logs }));
+          setDailyLogsMap(logs);
         },
         (error) => {
           console.warn("Firestore listener for dailyLogs:", error.message);

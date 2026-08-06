@@ -88,7 +88,6 @@ export const fetchAndCalculateStreak = async (userId: string): Promise<number> =
 export const ensureAndFetchUserStats = async (userId: string): Promise<UserStats> => {
   const statsRef = doc(db, 'users', userId);
   const statsSnap = await getDoc(statsRef);
-  const todayStr = getIsoDateStr();
 
   let stats: UserStats;
 
@@ -96,40 +95,30 @@ export const ensureAndFetchUserStats = async (userId: string): Promise<UserStats
     const data = statsSnap.data() as Partial<UserStats>;
     const streak = await fetchAndCalculateStreak(userId);
 
-    const totalXP = data.totalXP !== undefined && data.totalXP > 0 ? data.totalXP : 250;
+    const totalXP = data.totalXP !== undefined ? data.totalXP : 0;
     const level = Math.floor(Math.sqrt(totalXP / 100)) + 1;
-    const tasksCompleted = data.tasksCompleted !== undefined && data.tasksCompleted > 0 ? data.tasksCompleted : 2;
+    const tasksCompleted = data.tasksCompleted !== undefined ? data.tasksCompleted : 0;
 
     stats = {
       totalXP,
       level,
-      streak: streak > 0 ? streak : 1, // At least 1-day streak for active user session
+      streak,
       tasksCompleted,
       lastActiveDate: new Date().toISOString(),
       focusGoal: data.focusGoal || "Master core coursework and maintain daily consistency",
       journalEntries: data.journalEntries || []
     };
   } else {
-    // New user initial active baseline
+    // New user initial blank state
     stats = {
-      totalXP: 250,
-      level: 2,
-      streak: 1,
-      tasksCompleted: 2,
+      totalXP: 0,
+      level: 1,
+      streak: 0,
+      tasksCompleted: 0,
       lastActiveDate: new Date().toISOString(),
       focusGoal: "Master core coursework and maintain daily consistency",
       journalEntries: []
     };
-
-    // Seed today's daily log in Firestore
-    const todayLogRef = doc(db, 'users', userId, 'dailyLogs', todayStr);
-    await setDoc(todayLogRef, {
-      dateStr: todayStr,
-      xpEarned: 250,
-      tasksCompleted: 2,
-      subjects: ['GENERAL', 'DSA'],
-      lastUpdated: serverTimestamp()
-    }, { merge: true });
   }
 
   // Update user doc in Firestore

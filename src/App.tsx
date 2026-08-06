@@ -14,16 +14,23 @@ import { subscribeToSubjects } from './lib/firebase/subjects';
 import { subscribeToTasks, syncTaskToFirebase, removeTaskFromFirebase, resetDailyRegularTasks } from './lib/firebase/tasks';
 import { recordDailyTaskCompletion, ensureAndFetchUserStats } from './lib/firebase/progressTracker';
 
+export const BLANK_JOURNEY: StudyJourney = {
+  journey_title: "My Academic Journey",
+  current_milestone: "Semester Goals",
+  total_estimated_days: 0,
+  daily_tasks: []
+};
+
 export default function App() {
   const [view, setView] = useState<'home' | 'planner'>('home');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [journey, setJourney] = useState<StudyJourney>(MOCK_JOURNEY);
+  const [journey, setJourney] = useState<StudyJourney>(BLANK_JOURNEY);
   const [stats, setStats] = useState<UserStats>({
-    totalXP: 250,
-    level: 2,
-    streak: 1,
-    tasksCompleted: 2,
+    totalXP: 0,
+    level: 1,
+    streak: 0,
+    tasksCompleted: 0,
     lastActiveDate: new Date().toISOString(),
     focusGoal: "Master core coursework and maintain daily consistency",
     journalEntries: []
@@ -39,6 +46,9 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const initialLoadDone = useRef(false);
+
+  const seededSubjectsRef = useRef<string | null>(null);
+  const seededTasksRef = useRef<string | null>(null);
 
   // 1. Auth Setup
   useEffect(() => {
@@ -67,7 +77,8 @@ export default function App() {
         if (journeySnap.exists()) {
           setJourney(journeySnap.data() as StudyJourney);
         } else {
-          await setDoc(journeyRef, journey);
+          await setDoc(journeyRef, BLANK_JOURNEY);
+          setJourney(BLANK_JOURNEY);
         }
       } catch (err) {
         console.error("Firestore Load Error:", err);
@@ -86,6 +97,18 @@ export default function App() {
     const unsubscribe = subscribeToSubjects((subjects) => {
       if (subjects.length > 0) {
         setSubjectMastery(subjects);
+      } else {
+        if (seededSubjectsRef.current !== user.uid) {
+          seededSubjectsRef.current = user.uid;
+          import('./mockData').then(({ DEFAULT_STARTER_SUBJECTS }) => {
+            import('./lib/firebase/subjects').then(({ syncSubjectToFirebase }) => {
+              DEFAULT_STARTER_SUBJECTS.forEach(s => syncSubjectToFirebase(s));
+            });
+            setSubjectMastery(DEFAULT_STARTER_SUBJECTS);
+          });
+        } else {
+          setSubjectMastery([]);
+        }
       }
     });
     return () => unsubscribe();
@@ -95,8 +118,22 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const unsubscribe = subscribeToTasks((newTasks) => {
-      setTasks(newTasks);
-      resetDailyRegularTasks(newTasks);
+      if (newTasks.length > 0) {
+        setTasks(newTasks);
+        resetDailyRegularTasks(newTasks);
+      } else {
+        if (seededTasksRef.current !== user.uid) {
+          seededTasksRef.current = user.uid;
+          import('./mockData').then(({ DEFAULT_STARTER_TASKS }) => {
+            import('./lib/firebase/tasks').then(({ syncTaskToFirebase }) => {
+              DEFAULT_STARTER_TASKS.forEach(t => syncTaskToFirebase(t));
+            });
+            setTasks(DEFAULT_STARTER_TASKS);
+          });
+        } else {
+          setTasks([]);
+        }
+      }
     });
     return () => unsubscribe();
   }, [user]);
@@ -246,7 +283,7 @@ export default function App() {
         focusGoal: "",
         journalEntries: []
       });
-      setJourney(MOCK_JOURNEY);
+      setJourney(BLANK_JOURNEY);
       setSubjectMastery([]);
       
       alert("Data wiped successfully. Starting fresh.");

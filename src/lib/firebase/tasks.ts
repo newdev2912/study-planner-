@@ -37,21 +37,38 @@ export const removeTaskFromFirebase = async (taskId: string) => {
 };
 
 export const subscribeToTasks = (callback: (tasks: Task[]) => void) => {
-  const userId = auth.currentUser?.uid;
-  if (!userId) {
-    console.warn("Attempted to subscribe to tasks, but no user is authenticated.");
-    return () => {};
-  }
+  let unsubscribeSnapshot: (() => void) | null = null;
 
-  const tasksRef = collection(db, `users/${userId}/tasks`);
-  const q = query(tasksRef, orderBy('createdAt', 'desc'));
+  const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
 
-  return onSnapshot(q, (snapshot) => {
-    const tasks = snapshot.docs.map(doc => doc.data() as Task);
-    callback(tasks);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, `users/${userId}/tasks`);
+    if (!user) {
+      callback([]);
+      return;
+    }
+
+    const tasksRef = collection(db, `users/${user.uid}/tasks`);
+    const q = query(tasksRef, orderBy('createdAt', 'desc'));
+
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+      const tasks = snapshot.docs.map(doc => doc.data() as Task);
+      callback(tasks);
+    }, (error) => {
+      if (error.code === 'permission-denied') {
+        console.warn("Tasks listener permission pending auth sync.");
+      } else {
+        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/tasks`);
+      }
+    });
   });
+
+  return () => {
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    unsubscribeAuth();
+  };
 };
 
 export const resetDailyRegularTasks = async (tasks: Task[]) => {

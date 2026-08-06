@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { CheckCircle2, ClipboardCheck, ChevronUp, ChevronDown, Check } from 'lucide-react';
-import { Task, DailyFocusSession } from '../../types';
+import { Task, DailyFocusSession, SubjectData } from '../../types';
 import { cn } from '../../lib/utils';
 
 interface CompletedPanelProps {
   activeSession: DailyFocusSession | null;
   activeSessionTasks: Task[];
   onToggleSubTask: (taskId: string, subTaskId: string) => void;
+  subjectMastery?: SubjectData[];
 }
 
 const priorityTheme: { [key: string]: { border: string; text: string; badge: string; bullet: string } } = {
@@ -39,7 +40,8 @@ const priorityTheme: { [key: string]: { border: string; text: string; badge: str
 export const CompletedPanel = ({
   activeSession,
   activeSessionTasks,
-  onToggleSubTask
+  onToggleSubTask,
+  subjectMastery = []
 }: CompletedPanelProps) => {
   const [tab, setTab] = useState<'study' | 'daily'>('study');
   const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
@@ -48,54 +50,129 @@ export const CompletedPanel = ({
     setExpandedCards(prev => ({ ...prev, [cardId]: !prev[cardId] }));
   };
 
-  const hasFirestoreSession = activeSession && activeSession.items && activeSession.items.length > 0;
+  const getCompletedGroups = () => {
+    const groupsMap: { 
+      [key: string]: { 
+        moduleId: string; 
+        moduleName: string; 
+        subjectName: string; 
+        priority: string; 
+        taskCategory: string; 
+        items: any[]; 
+        totalCount: number;
+      } 
+    } = {};
 
-  const getCompletedFirestoreGroups = () => {
-    if (!hasFirestoreSession) return [];
-    
-    const items = activeSession.items.filter((i: any) => i.isStaged);
-    const groups: { [key: string]: { moduleId: string; moduleName: string; subjectName: string; priority: string; taskCategory: string; items: any[] } } = {};
-    
-    items.forEach((item: any) => {
-      const key = `${item.subjectId}_${item.moduleId}`;
-      if (!groups[key]) {
-        groups[key] = {
-          moduleId: item.moduleId,
-          moduleName: item.moduleName,
-          subjectName: item.subjectName,
-          priority: item.priority || 'low',
-          taskCategory: item.taskCategory || 'STUDY',
-          items: []
-        };
-      }
-      groups[key].items.push(item);
-    });
-    
-    return Object.values(groups).filter(group => {
-      return group.items.length > 0 && group.items.every(i => i.isCompleted);
-    });
+    // 1. Collect from activeSession items
+    if (activeSession && activeSession.items) {
+      activeSession.items.forEach((item: any) => {
+        if (!item.isStaged) return;
+        const key = `${item.subjectName || 'General'}_${item.moduleName || 'Module'}`;
+        if (!groupsMap[key]) {
+          groupsMap[key] = {
+            moduleId: item.moduleId || item.id,
+            moduleName: item.moduleName || item.subjectName || 'Module',
+            subjectName: item.subjectName || 'General',
+            priority: item.priority || 'low',
+            taskCategory: item.taskCategory || 'STUDY',
+            items: [],
+            totalCount: 0
+          };
+        }
+        groupsMap[key].totalCount++;
+        if (item.isCompleted) {
+          if (!groupsMap[key].items.some((i: any) => i.id === item.id)) {
+            groupsMap[key].items.push({
+              id: item.id,
+              topicTitle: item.topicTitle || item.moduleName,
+              isCompleted: true
+            });
+          }
+        }
+      });
+    }
+
+    // 2. Collect from subjectMastery completed topics
+    if (subjectMastery && subjectMastery.length > 0) {
+      subjectMastery.forEach((subject) => {
+        const priority = subject.priority || 'low';
+        const taskCategory = subject.taskType || 'STUDY';
+        (subject.modules || []).forEach((mod) => {
+          const key = `${subject.name}_${mod.name}`;
+          const completedTopics = (mod.topics || []).filter(t => t.completed);
+          if (completedTopics.length > 0) {
+            if (!groupsMap[key]) {
+              groupsMap[key] = {
+                moduleId: mod.id,
+                moduleName: mod.name,
+                subjectName: subject.name,
+                priority,
+                taskCategory,
+                items: [],
+                totalCount: mod.topics.length
+              };
+            }
+            completedTopics.forEach(topic => {
+              const itemId = `${subject.id}_${mod.id}_${topic.id}`;
+              if (!groupsMap[key].items.some((i: any) => i.id === itemId || i.topicTitle === topic.title)) {
+                groupsMap[key].items.push({
+                  id: itemId,
+                  topicTitle: topic.title,
+                  isCompleted: true
+                });
+              }
+            });
+            groupsMap[key].totalCount = Math.max(groupsMap[key].totalCount, mod.topics.length);
+          }
+        });
+      });
+    }
+
+    // 3. Collect from activeSessionTasks
+    if (activeSessionTasks && activeSessionTasks.length > 0) {
+      activeSessionTasks.forEach((task: any) => {
+        const selectedSubTasks = task.subTasks?.filter((st: any) => st.selected) || [];
+        const completedSubTasks = selectedSubTasks.filter((st: any) => st.completed);
+        const isCompleted = selectedSubTasks.length > 0 
+          ? completedSubTasks.length > 0 
+          : task.completed;
+
+        if (isCompleted) {
+          const key = `${task.subject || 'General'}_${task.task_title}`;
+          if (!groupsMap[key]) {
+            groupsMap[key] = {
+              moduleId: task.id,
+              moduleName: task.task_title,
+              subjectName: task.subject || 'General',
+              priority: task.priority || 'low',
+              taskCategory: task.taskType || 'DAILY',
+              items: [],
+              totalCount: selectedSubTasks.length || 1
+            };
+          }
+          const itemsToPush = selectedSubTasks.length > 0 
+            ? completedSubTasks.map((st: any) => ({
+                id: `${task.id}_${st.id}`,
+                topicTitle: st.title,
+                isCompleted: true
+              }))
+            : [{ id: `${task.id}_default`, topicTitle: task.task_title, isCompleted: true }];
+
+          itemsToPush.forEach(item => {
+            if (!groupsMap[key].items.some((i: any) => i.id === item.id)) {
+              groupsMap[key].items.push(item);
+            }
+          });
+        }
+      });
+    }
+
+    return Object.values(groupsMap).filter(g => g.items.length > 0);
   };
 
-  const getCompletedFallbackTasks = () => {
-    return activeSessionTasks.filter(task => {
-      const selectedSubTasks = task.subTasks?.filter(st => st.selected) || [];
-      const isCompleted = selectedSubTasks.length > 0 
-        ? selectedSubTasks.every(st => st.completed) 
-        : task.completed;
-      return isCompleted;
-    });
-  };
-
-  const completedFirestoreGroups = getCompletedFirestoreGroups();
-  const completedFallbackTasks = getCompletedFallbackTasks();
-
-  const completedStudyGroups = hasFirestoreSession
-    ? completedFirestoreGroups.filter(g => g.taskCategory !== 'DAILY')
-    : completedFallbackTasks.filter(t => t.taskType !== 'DAILY');
-
-  const completedDailyGroups = hasFirestoreSession
-    ? completedFirestoreGroups.filter(g => g.taskCategory === 'DAILY')
-    : completedFallbackTasks.filter(t => t.taskType === 'DAILY');
+  const allCompletedGroups = getCompletedGroups();
+  const completedStudyGroups = allCompletedGroups.filter(g => g.taskCategory !== 'DAILY');
+  const completedDailyGroups = allCompletedGroups.filter(g => g.taskCategory === 'DAILY');
 
   const activeCompletedList = tab === 'study' ? completedStudyGroups : completedDailyGroups;
 
@@ -119,18 +196,18 @@ export const CompletedPanel = ({
         <button
           onClick={() => setTab('study')}
           className={cn(
-            "flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg",
+            "flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg cursor-pointer whitespace-nowrap px-2 text-center",
             tab === 'study'
               ? "bg-rose-600 text-white shadow-lg shadow-rose-500/20"
               : "text-slate-500 hover:text-slate-300"
           )}
         >
-          Study Tracks
+          Study Tasks
         </button>
         <button
           onClick={() => setTab('daily')}
           className={cn(
-            "flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg",
+            "flex-1 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all rounded-lg cursor-pointer whitespace-nowrap px-2 text-center",
             tab === 'daily'
               ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
               : "text-slate-500 hover:text-slate-300"
@@ -161,16 +238,12 @@ export const CompletedPanel = ({
             {activeCompletedList.map((card: any) => {
               const priorityKey = card.priority || 'low';
               const theme = priorityTheme[priorityKey] || priorityTheme['low'];
+              const cardId = `${card.subjectName}_${card.moduleName}`;
+              const isExpanded = expandedCards[cardId] !== false; // expanded by default
               
-              const cardId = hasFirestoreSession 
-                ? `${card.subjectName}_${card.moduleId}`
-                : card.id;
-
-              const isExpanded = !!expandedCards[cardId];
-              
-              const subItems = hasFirestoreSession 
-                ? card.items 
-                : (card.subTasks?.filter((st: any) => st.selected) || []);
+              const completedCount = card.items.length;
+              const totalCount = card.totalCount;
+              const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
 
               return (
                 <div 
@@ -190,10 +263,10 @@ export const CompletedPanel = ({
                         "text-[7px] font-black tracking-widest uppercase block",
                         theme.text
                       )}>
-                        {hasFirestoreSession ? card.subjectName : card.subject}
+                        {card.subjectName}
                       </span>
                       <h6 className="text-[10.5px] font-bold text-slate-300 truncate mt-0.5 leading-snug">
-                        {hasFirestoreSession ? card.moduleName : card.task_title}
+                        {card.moduleName}
                       </h6>
                     </div>
 
@@ -202,7 +275,7 @@ export const CompletedPanel = ({
                         "px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase border",
                         theme.badge
                       )}>
-                        100%
+                        {pct}%
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
@@ -215,26 +288,21 @@ export const CompletedPanel = ({
                   {/* Collapsed list of completed topics */}
                   {isExpanded && (
                     <div className="p-2.5 bg-slate-950/40 border-t border-slate-900/40 space-y-1.5">
-                      {subItems.map((sub: any) => {
-                        const subId = hasFirestoreSession ? sub.id : sub.id;
+                      {card.items.map((sub: any) => {
                         return (
                           <div 
-                            key={subId}
+                            key={sub.id}
                             onClick={() => {
-                              if (hasFirestoreSession) {
-                                onToggleSubTask(subId, "");
-                              } else {
-                                onToggleSubTask(card.id, sub.id);
-                              }
+                              onToggleSubTask(sub.id, "");
                             }}
-                            className="flex items-start gap-2 p-1 rounded-md hover:bg-slate-900/30 transition-all cursor-pointer group"
+                            className="flex items-start gap-2 p-1.5 rounded-md hover:bg-slate-900/30 transition-all cursor-pointer group"
                           >
                             <div className="w-4 h-4 rounded bg-emerald-500/10 border border-emerald-500/50 flex items-center justify-center shrink-0 mt-0.5 group-hover:border-rose-500/50 group-hover:bg-rose-500/10">
                               <Check className="w-2.5 h-2.5 text-emerald-400 group-hover:hidden" />
                               <span className="text-[7px] font-black text-rose-400 hidden group-hover:inline">UNDO</span>
                             </div>
-                            <span className="text-[9px] text-slate-500 line-through group-hover:text-slate-300 select-none">
-                              {hasFirestoreSession ? sub.topicTitle : sub.title}
+                            <span className="text-[9.5px] text-slate-400 line-through group-hover:text-slate-200 select-none">
+                              {sub.topicTitle}
                             </span>
                           </div>
                         );

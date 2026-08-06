@@ -132,16 +132,36 @@ export const deleteSubjectFromFirebase = async (subjectId: string) => {
 };
 
 export const subscribeToSubjects = (callback: (subjects: SubjectData[]) => void) => {
-  const userId = auth.currentUser?.uid;
-  if (!userId) return () => {};
+  let unsubscribeSnapshot: (() => void) | null = null;
 
-  const subjectsRef = collection(db, `users/${userId}/subjects`);
-  const q = query(subjectsRef, orderBy('createdAt', 'desc'));
+  const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
 
-  return onSnapshot(q, (snapshot) => {
-    const subjects = snapshot.docs.map(doc => doc.data() as SubjectData);
-    callback(subjects);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, `users/${userId}/subjects`);
+    if (!user) {
+      callback([]);
+      return;
+    }
+
+    const subjectsRef = collection(db, `users/${user.uid}/subjects`);
+    const q = query(subjectsRef, orderBy('createdAt', 'desc'));
+
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+      const subjects = snapshot.docs.map(doc => doc.data() as SubjectData);
+      callback(subjects);
+    }, (error) => {
+      if (error.code === 'permission-denied') {
+        console.warn("Subjects listener permission pending auth sync.");
+      } else {
+        handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/subjects`);
+      }
+    });
   });
+
+  return () => {
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    unsubscribeAuth();
+  };
 };

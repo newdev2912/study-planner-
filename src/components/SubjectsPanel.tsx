@@ -123,12 +123,25 @@ export const SubjectsPanel = ({ subjects, setSubjects }: SubjectsPanelProps) => 
             return m;
           })
         };
-        syncSubjectToFirebase(nextSub);
+        syncSubjectToFirebase(nextSub).catch(console.error);
         return nextSub;
       }
       return s;
     });
     handleSync(updated);
+
+    if (updates.completed !== undefined) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const itemId = `${subjectId}_${moduleId}_${topicId}`;
+      import('../lib/firebase/session').then(mod => {
+        mod.toggleCompletedStagedItem(todayStr, itemId, updates.completed!).catch(console.error);
+      });
+      if (updates.completed) {
+        import('../lib/firebase/progressTracker').then(mod => {
+          mod.recordDailyTaskCompletion(50, 'FOCUS').catch(console.error);
+        });
+      }
+    }
   };
 
   const removeModule = (subjectId: string, moduleId: string) => {

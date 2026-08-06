@@ -92,20 +92,15 @@ export const TopPanel = ({
       });
     }
 
-    // Default fallback subject items matching demo specification
-    return [
-      { id: '1', name: 'evs', completed: 9, total: 12, status: 'active' },
-      { id: '2', name: 'dsa', completed: 1, total: 6, status: 'pending' },
-      { id: '3', name: 'civics', completed: 1, total: 2, status: 'pending' },
-      { id: '4', name: 'geography', completed: 3, total: 3, status: 'completed' },
-    ];
+    // If no subjects found, return empty array for clean slate user
+    return [];
   };
 
   const subjectItems = getSubjectItems();
 
   return (
     <OperationalHeader
-      initialTitle={journeyTitle || "Engineering & CS • Fall Semester"}
+      initialTitle={journeyTitle || "My Academic Journey"}
       subjects={subjectItems}
       overallProgress={completionPercentage}
       onNavigateBase={() => setView('home')}

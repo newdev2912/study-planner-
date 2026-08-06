@@ -184,9 +184,16 @@ export const CentralPanel = ({
 
   // Handle task selection
   const toggleTaskSelection = (taskId: string) => {
-    setSelectedTaskIds(prev => 
-      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-    );
+    const isCurrentlySelected = selectedTaskIds.includes(taskId);
+    if (taskId.startsWith("subject-")) {
+      if (onToggleSubTask) {
+        onToggleSubTask(taskId, isCurrentlySelected ? "subject-unstage-all" : "subject-stage-all");
+      }
+    } else {
+      setSelectedTaskIds(prev => 
+        isCurrentlySelected ? prev.filter(id => id !== taskId) : [...prev, taskId]
+      );
+    }
   };
 
   // Toggle individual task completed state in the master archive list
@@ -393,6 +400,7 @@ export const CentralPanel = ({
   const handleDeploySession = () => {
     onStartSession();
     setViewMode('focus');
+    setIsRunning(true);
   };
 
   // Unified task compile helper
@@ -605,12 +613,19 @@ export const CentralPanel = ({
               {/* Master Archive Task list */}
               <div className="flex-1 overflow-y-auto pr-1 space-y-3 no-scrollbar min-h-0 pb-12">
                 {unifiedTasks.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-24 text-center">
-                    <AlertCircle className="w-12 h-12 text-slate-800 mb-3" />
-                    <span className="text-[10px] font-black tracking-widest uppercase text-slate-500">ARCHIVE EMPTY</span>
-                    <p className="text-[11px] text-slate-600 max-w-xs mt-1">
-                      No coursework tasks currently exist in your master archive database. Deploy a new one to begin.
+                  <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+                    <AlertCircle className="w-12 h-12 text-purple-400/80 mb-3 animate-pulse" />
+                    <span className="text-xs font-black tracking-widest uppercase text-slate-300">NO COURSEWORK IN ARCHIVE</span>
+                    <p className="text-xs text-slate-400 max-w-sm mt-1 mb-5 leading-relaxed">
+                      Your master archive is currently empty. Click below to populate a full starter study roadmap with Computer Science, Calculus, and Biology, or add custom tasks manually.
                     </p>
+                    <button
+                      onClick={handleDeploySession}
+                      className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-purple-900/30 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2 border border-purple-400/30 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4 text-yellow-300" />
+                      POPULATE STARTER ROADMAP
+                    </button>
                   </div>
                 ) : (
                   unifiedTasks.map((task) => {
@@ -1115,16 +1130,10 @@ export const CentralPanel = ({
               <div className="flex justify-end pt-3 mt-1 flex-shrink-0">
                 <button
                   onClick={handleDeploySession}
-                  disabled={selectedTaskIds.length === 0}
-                  className={cn(
-                    "px-3 py-1.5 font-extrabold text-[10px] tracking-wider uppercase rounded-xl shadow-md transition-all flex items-center gap-1.5 border hover:scale-[1.03] active:scale-95 font-jakarta",
-                    selectedTaskIds.length === 0
-                      ? "bg-slate-900/50 border-slate-800/80 text-slate-600 cursor-not-allowed"
-                      : "bg-cyan-950/40 hover:bg-cyan-900/60 border-cyan-500/50 hover:border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  )}
+                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold text-[11px] tracking-wider uppercase rounded-xl shadow-lg shadow-cyan-900/30 transition-all flex items-center gap-2 border border-cyan-400/40 hover:scale-[1.03] active:scale-95 font-jakarta cursor-pointer"
                 >
-                  <Activity className="w-3.5 h-3.5 animate-pulse text-cyan-400" />
-                  POPULATE
+                  <Activity className="w-4 h-4 animate-pulse text-cyan-200" />
+                  POPULATE & START SESSION
                 </button>
               </div>
             </motion.div>

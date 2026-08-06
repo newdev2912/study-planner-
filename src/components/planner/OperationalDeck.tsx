@@ -18,17 +18,12 @@ interface OperationalHeaderProps {
   onTitleChange?: (newTitle: string) => void;
 }
 
-const DEFAULT_SUBJECTS: SubjectItem[] = [
-  { id: '1', name: 'evs', completed: 9, total: 12, status: 'active' },
-  { id: '2', name: 'dsa', completed: 1, total: 6, status: 'pending' },
-  { id: '3', name: 'civics', completed: 1, total: 2, status: 'pending' },
-  { id: '4', name: 'geography', completed: 3, total: 3, status: 'completed' },
-];
+const DEFAULT_SUBJECTS: SubjectItem[] = [];
 
 export const OperationalHeader: React.FC<OperationalHeaderProps> = ({
-  initialTitle = "Engineering & CS • Fall Semester",
+  initialTitle = "My Academic Journey",
   subjects = DEFAULT_SUBJECTS,
-  overallProgress = 61,
+  overallProgress = 0,
   onNavigateBase,
   onTitleChange
 }) => {

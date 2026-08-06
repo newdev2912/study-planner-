@@ -32,25 +32,45 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
 
   // Subscribe to historical Daily Focus Sessions to build an authentic consistency dashboard
   useEffect(() => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) {
-      return;
-    }
-    
-    const sessionsCol = collection(db, `users/${userId}/dailyFocusSessions`);
-    const q = query(sessionsCol, orderBy("date", "desc"), limit(7));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const sessions: any[] = [];
-      snapshot.forEach((doc) => {
-        sessions.push(doc.data());
-      });
-      setHistorySessions(sessions);
-    }, (error) => {
-      console.error("Error loading daily sessions history:", error);
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+
+      if (!user) {
+        setHistorySessions([]);
+        return;
+      }
+
+      const sessionsCol = collection(db, `users/${user.uid}/dailyFocusSessions`);
+      const q = query(sessionsCol, orderBy("date", "desc"), limit(7));
+
+      unsubscribeSnapshot = onSnapshot(
+        q,
+        (snapshot) => {
+          const sessions: any[] = [];
+          snapshot.forEach((doc) => {
+            sessions.push(doc.data());
+          });
+          setHistorySessions(sessions);
+        },
+        (error) => {
+          if (error.code === 'permission-denied') {
+            console.warn("Sessions history listener permission pending auth sync.");
+          } else {
+            console.error("Error loading daily sessions history:", error);
+          }
+        }
+      );
     });
-    
-    return () => unsubscribe();
+
+    return () => {
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      unsubscribeAuth();
+    };
   }, []);
 
   // Generate date markers for last 7 calendar days to show in consistency tracker
