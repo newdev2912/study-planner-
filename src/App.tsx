@@ -16,6 +16,8 @@ import { recordDailyTaskCompletion, ensureAndFetchUserStats } from './lib/fireba
 import { toggleMultipleStagedItems } from './lib/firebase/session';
 import { DEFAULT_STARTER_SUBJECTS, DEFAULT_STARTER_TASKS } from './mockData';
 
+// checking if the changes are actually being made 
+
 export const BLANK_JOURNEY: StudyJourney = {
   journey_title: "My Academic Journey",
   current_milestone: "Semester Goals",
