@@ -104,7 +104,7 @@ export const LeftPanel = ({
               <p className="text-[10px] text-slate-500 leading-relaxed max-w-[200px] mx-auto">
                 {isActive 
                   ? "Outstanding job! All of your staged topics have been completed and moved to the Completed panel."
-                  : "Mark tasks inside the Master Archive and click the POPULATE & START SESSION button to deploy active checklist tracks."}
+                  : "Select or check topics in the Master Archive tab to add them to your active checklist."}
               </p>
             </div>
           </div>

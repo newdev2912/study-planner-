@@ -271,9 +271,7 @@ export const FocusModePanel: React.FC<FocusModeProps> = ({
               onClick={() => activeSessionActive && setIsEditing(true)}
               className={cn(
                 "group relative font-mono text-[100px] sm:text-[120px] xl:text-[140px] font-black tracking-tighter leading-none my-2 transition-all duration-300 select-none",
-                theme.textColor,
-                theme.dropShadow,
-                activeSessionActive ? 'cursor-pointer' : ''
+                activeSessionActive ? cn(theme.textColor, theme.dropShadow, 'cursor-pointer') : "text-slate-800/80"
               )}
               title={activeSessionActive ? "Click to set custom time" : undefined}
             >
@@ -386,14 +384,28 @@ export const FocusModePanel: React.FC<FocusModeProps> = ({
         )}
       </div>
 
-      {/* Warning overlay if no session active */}
+      {/* Subtle overlay if no session active */}
       {!activeSessionActive && (
-        <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center text-center p-6 z-20 rounded-2xl">
-          <Target className="w-12 h-12 text-amber-500 animate-bounce mb-3" />
-          <span className="text-xs font-black text-slate-200 tracking-[0.2em] uppercase block mb-2">SESSION NOT POPULATED</span>
-          <p className="text-xs text-slate-400 max-w-[280px] leading-relaxed">
-            Mark study tasks in your archive and click <strong className="text-purple-400">POPULATE & START SESSION</strong> on the left panel to unlock the interactive countdown system.
-          </p>
+        <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-6 z-20 rounded-2xl transition-all duration-300">
+          <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 max-w-sm flex flex-col items-center shadow-2xl backdrop-blur-md animate-fadeIn">
+            <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-2.5 text-amber-400">
+              <Target className="w-5 h-5 animate-pulse" />
+            </div>
+            <span className="text-[11px] font-black text-slate-200 tracking-[0.2em] uppercase block mb-2">
+              SESSION NOT POPULATED
+            </span>
+            <div className="text-xs text-slate-400 leading-relaxed space-y-2 text-left bg-slate-950/60 p-3 rounded-xl border border-slate-800/60 w-full">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">How to start a session:</p>
+              <div className="flex items-start gap-2 text-[11px] text-slate-300">
+                <span className="flex shrink-0 w-4 h-4 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[9px] font-black items-center justify-center mt-0.5">1</span>
+                <span>Switch to the <strong className="text-amber-400 font-bold">ARCHIVE</strong> tab above</span>
+              </div>
+              <div className="flex items-start gap-2 text-[11px] text-slate-300">
+                <span className="flex shrink-0 w-4 h-4 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[9px] font-black items-center justify-center mt-0.5">2</span>
+                <span>Check any topic or task to stage it for today's active session</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
