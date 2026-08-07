@@ -43,20 +43,17 @@ export const PlannerView = ({
   const [activeSessionActive, setActiveSessionActive] = useState<boolean>(false);
   const [activeSession, setActiveSession] = useState<any | null>(null);
 
-  // Real-time Firestore session sync subscription
-  useEffect(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const unsubscribe = listenToDailySession(todayStr, (session) => {
-      if (session) {
-        setActiveSession(session);
-        setActiveSessionActive(session.isActive);
-      }
-    });
+  // Refs for keeping state synced inside async callbacks/effects without resubscribing
+  const latestSubjectsRef = React.useRef(subjectMastery);
+  const latestDailyTasksRef = React.useRef(journey.daily_tasks);
 
-    return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
-    };
-  }, []);
+  React.useEffect(() => {
+    latestSubjectsRef.current = subjectMastery;
+  }, [subjectMastery]);
+
+  React.useEffect(() => {
+    latestDailyTasksRef.current = journey.daily_tasks;
+  }, [journey.daily_tasks]);
 
   // Auto-enrich journey daily_tasks with taskType & subTasks if missing
   useEffect(() => {
@@ -113,6 +110,188 @@ export const PlannerView = ({
     }
   }, [journey.daily_tasks, setJourney]);
 
+  const syncActiveSessionWithSelections = (
+    latestSubjects: SubjectData[],
+    latestDailyTasks: Task[],
+    latestSelectedTaskIds: string[] = selectedTaskIds,
+    latestTasks: Task[] = tasks
+  ) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const stagedItems: StagedFocusItem[] = [];
+    const newActiveTaskIds: string[] = [];
+
+    // Compile from latestSubjects
+    if (latestSubjects) {
+      latestSubjects.forEach(s => {
+        s.modules.forEach(m => {
+          m.topics.forEach((topic) => {
+            let shouldStage = false;
+            if (!topic.completed) {
+              if (topic.selected === true) {
+                shouldStage = true;
+              }
+            }
+            if (shouldStage) {
+              stagedItems.push({
+                id: `${s.id}_${m.id}_${topic.id}`,
+                subjectId: s.id,
+                subjectName: s.name,
+                taskCategory: s.taskType || 'STUDY',
+                priority: s.priority || 'low',
+                moduleId: m.id,
+                moduleName: m.name,
+                topicId: topic.id,
+                topicTitle: topic.title,
+                isStaged: true,
+                isCompleted: topic.completed,
+                stagedAt: new Date().toISOString()
+              });
+              if (!newActiveTaskIds.includes(`subject-${s.id}`)) {
+                newActiveTaskIds.push(`subject-${s.id}`);
+              }
+            }
+          });
+        });
+      });
+    }
+
+    // Compile from latestDailyTasks and latestTasks
+    const combinedTasks = [...(latestTasks || []), ...(latestDailyTasks || [])];
+    const processedTaskIds = new Set<string>();
+
+    combinedTasks.forEach(t => {
+      if (processedTaskIds.has(t.id)) return;
+      processedTaskIds.add(t.id);
+
+      const isTaskSelectedInIds = latestSelectedTaskIds.includes(t.id);
+
+      if (t.subTasks && t.subTasks.length > 0) {
+        let addedAny = false;
+        t.subTasks.forEach(st => {
+          let shouldStage = false;
+          if (!st.completed) {
+            if (st.selected === true) {
+              shouldStage = true;
+            }
+          }
+          if (shouldStage) {
+            stagedItems.push({
+              id: `${t.id}_${st.id}`,
+              subjectId: t.id,
+              subjectName: t.subject || 'General',
+              taskCategory: t.taskType || 'DAILY',
+              priority: t.priority || 'low',
+              moduleId: t.id,
+              moduleName: t.task_title,
+              topicId: st.id,
+              topicTitle: st.title,
+              isStaged: true,
+              isCompleted: st.completed,
+              stagedAt: new Date().toISOString()
+            });
+            addedAny = true;
+          }
+        });
+        if (addedAny && !newActiveTaskIds.includes(t.id)) {
+          newActiveTaskIds.push(t.id);
+        }
+      } else {
+        let shouldStage = false;
+        if (!t.completed) {
+          if (isTaskSelectedInIds) {
+            shouldStage = true;
+          }
+        }
+        if (shouldStage) {
+          stagedItems.push({
+            id: `${t.id}_default`,
+            subjectId: t.id,
+            subjectName: t.subject || 'General',
+            taskCategory: t.taskType || 'DAILY',
+            priority: t.priority || 'low',
+            moduleId: t.id,
+            moduleName: t.task_title,
+            topicId: 'default',
+            topicTitle: t.task_title,
+            isStaged: true,
+            isCompleted: t.completed,
+            stagedAt: new Date().toISOString()
+          });
+          if (!newActiveTaskIds.includes(t.id)) {
+            newActiveTaskIds.push(t.id);
+          }
+        }
+      }
+    });
+
+    setActiveSessionTaskIds(newActiveTaskIds);
+    const totalTasks = stagedItems.length;
+    const completedTasks = stagedItems.filter(i => i.isCompleted).length;
+
+    setActiveSession((prev: any) => {
+      return {
+        ...(prev || {}),
+        date: todayStr,
+        items: stagedItems,
+        isActive: totalTasks > 0,
+        totalTasks,
+        completedTasks
+      };
+    });
+    setActiveSessionActive(totalTasks > 0);
+
+    commitDailySession(todayStr, stagedItems).catch(console.error);
+  };
+
+  // Real-time Firestore session sync subscription
+  useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const unsubscribe = listenToDailySession(todayStr, (session) => {
+      if (session) {
+        setActiveSession(session);
+        setActiveSessionActive(session.isActive);
+      } else {
+        // Automatically compile and sync today's session if it doesn't exist yet!
+        syncActiveSessionWithSelections(latestSubjectsRef.current, latestDailyTasksRef.current);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  // Sync activeSessionTaskIds on load or activeSession update
+  useEffect(() => {
+    if (activeSession && activeSession.items) {
+      const taskIds = new Set<string>();
+      activeSession.items.forEach((item: any) => {
+        if (item.isStaged) {
+          if (item.id.includes('_')) {
+            const parts = item.id.split('_');
+            const taskId = parts[0];
+            if (taskId.startsWith('task-')) {
+              taskIds.add(taskId);
+            } else {
+              taskIds.add(`subject-${item.subjectId}`);
+            }
+          }
+        }
+      });
+      setActiveSessionTaskIds(Array.from(taskIds));
+    }
+  }, [activeSession]);
+
+  const handleSetSelectedTaskIds = (newIdsOrFn: string[] | ((prev: string[]) => string[])) => {
+    setSelectedTaskIds(prev => {
+      const next = typeof newIdsOrFn === 'function' ? newIdsOrFn(prev) : newIdsOrFn;
+      setTimeout(() => {
+        syncActiveSessionWithSelections(subjectMastery, journey.daily_tasks, next);
+      }, 0);
+      return next;
+    });
+  };
+
   // Handle toggling subtasks selection from Central Panel (staged for today)
   const handleToggleSubTaskSelection = (taskId: string, subTaskId: string) => {
     if (taskId.startsWith("subject-")) {
@@ -120,6 +299,7 @@ export const PlannerView = ({
       let isStagedAction = false;
       let isUnstagedAction = false;
 
+      let nextSelectedTaskIds = selectedTaskIds;
       const updated = subjectMastery.map(s => {
         if (s.id === subjectId) {
           let nextSub = { ...s };
@@ -128,7 +308,10 @@ export const PlannerView = ({
             isStagedAction = true;
             nextSub.modules = (s.modules || []).map(m => ({
               ...m,
-              topics: (m.topics || []).map(t => ({ ...t, selected: true }))
+              topics: (m.topics || []).map(t => ({
+                ...t,
+                selected: t.completed ? false : true
+              }))
             }));
           } else if (subTaskId === "subject-unstage-all") {
             isUnstagedAction = true;
@@ -142,7 +325,10 @@ export const PlannerView = ({
               if (m.id === modId) {
                 return {
                   ...m,
-                  topics: (m.topics || []).map(t => ({ ...t, selected: true }))
+                  topics: (m.topics || []).map(t => ({
+                    ...t,
+                    selected: t.completed ? false : true
+                  }))
                 };
               }
               return m;
@@ -179,15 +365,24 @@ export const PlannerView = ({
       });
       setSubjectMastery(updated);
 
-      // Automatically add or remove subject from selectedTaskIds
-      const targetSubject = updated.find(s => s.id === subjectId);
-      const hasAnySelected = targetSubject?.modules.some(m => m.topics.some(t => t.selected)) || false;
-
-      if (isStagedAction || hasAnySelected) {
-        setSelectedTaskIds(prev => prev.includes(taskId) ? prev : [...prev, taskId]);
-      } else if (isUnstagedAction || !hasAnySelected) {
-        setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+      // Automatically add or remove subject from selectedTaskIds ONLY for explicit stage/unstage all actions
+      if (isStagedAction) {
+        setSelectedTaskIds(prev => {
+          const next = prev.includes(taskId) ? prev : [...prev, taskId];
+          nextSelectedTaskIds = next;
+          return next;
+        });
+      } else if (isUnstagedAction) {
+        setSelectedTaskIds(prev => {
+          const next = prev.filter(id => id !== taskId);
+          nextSelectedTaskIds = next;
+          return next;
+        });
       }
+
+      setTimeout(() => {
+        syncActiveSessionWithSelections(updated, journey.daily_tasks, nextSelectedTaskIds);
+      }, 0);
       return;
     }
 
@@ -209,45 +404,38 @@ export const PlannerView = ({
           // Sync to Firebase
           syncTaskToFirebase(updatedTask).catch(console.error);
 
-          const hasAnySelected = updatedSubTasks.some(st => st.selected);
-          if (hasAnySelected) {
-            setSelectedTaskIds(prev => prev.includes(taskId) ? prev : [...prev, taskId]);
-          } else {
-            setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
-          }
+          const updatedTasksList = tasks.map(t => t.id === realTaskId ? updatedTask : t);
+          setTimeout(() => {
+            syncActiveSessionWithSelections(subjectMastery, journey.daily_tasks, selectedTaskIds, updatedTasksList);
+          }, 0);
         }
       }
     }
 
-    setJourney(prev => {
-      const updatedTasks = prev.daily_tasks.map(t => {
-        if (t.id !== taskId) return t;
+    const updatedTasks = journey.daily_tasks.map(t => {
+      if (t.id !== taskId) return t;
 
-        const subTasks = t.subTasks?.map(st => {
-          if (st.id === subTaskId) {
-            return { ...st, selected: !st.selected };
-          }
-          return st;
-        }) || [];
-
-        const hasAnySelected = subTasks.some(st => st.selected);
-        if (hasAnySelected) {
-          setSelectedTaskIds(prev => prev.includes(taskId) ? prev : [...prev, taskId]);
-        } else {
-          setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+      const subTasks = t.subTasks?.map(st => {
+        if (st.id === subTaskId) {
+          return { ...st, selected: !st.selected };
         }
-
-        return {
-          ...t,
-          subTasks
-        };
-      });
+        return st;
+      }) || [];
 
       return {
-        ...prev,
-        daily_tasks: updatedTasks
+        ...t,
+        subTasks
       };
     });
+
+    setJourney(prev => ({
+      ...prev,
+      daily_tasks: updatedTasks
+    }));
+
+    setTimeout(() => {
+      syncActiveSessionWithSelections(subjectMastery, updatedTasks);
+    }, 0);
   };
 
   // Handle toggling subtasks completion from Left Panel (active checklist checkoff)
@@ -401,240 +589,17 @@ export const PlannerView = ({
     });
   };
 
-  const handleStartSession = async () => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    let currentSubjects = [...subjectMastery];
-    let currentJourneyTasks = [...journey.daily_tasks];
-    let currentRegularTasks = [...(tasks || [])];
+  const handlePopulateStarterRoadmap = () => {
+    setSubjectMastery(DEFAULT_STARTER_SUBJECTS);
+    setJourney(prev => ({
+      ...prev,
+      journey_title: "Fall Semester Mastery: Engineering & CS",
+      daily_tasks: DEFAULT_STARTER_TASKS
+    }));
 
-    // Auto-populate starter coursework if user dashboard/archive is empty
-    if (currentSubjects.length === 0 && currentJourneyTasks.length === 0 && currentRegularTasks.length === 0) {
-      currentSubjects = DEFAULT_STARTER_SUBJECTS;
-      currentJourneyTasks = DEFAULT_STARTER_TASKS;
-      setSubjectMastery(currentSubjects);
-      setJourney(prev => ({
-        ...prev,
-        journey_title: "Fall Semester Mastery: Engineering & CS",
-        daily_tasks: currentJourneyTasks
-      }));
-
-      // Sync starter data to Firebase asynchronously
-      currentSubjects.forEach(s => syncSubjectToFirebase(s).catch(console.error));
-      currentJourneyTasks.forEach(t => syncTaskToFirebase(t).catch(console.error));
-    }
-
-    const stagedItems: StagedFocusItem[] = [];
-    const newActiveTaskIds: string[] = [];
-
-    // Check if any specific topics or subtasks are marked selected
-    const hasSpecificTopicSelected = currentSubjects.some(s => 
-      s.modules.some(m => m.topics.some(t => t.selected === true))
-    );
-    const hasSpecificSubTaskSelected = currentRegularTasks.some(t => 
-      t.subTasks?.some(st => st.selected === true)
-    ) || currentJourneyTasks.some(t => 
-      t.subTasks?.some(st => st.selected === true)
-    );
-    const hasAnySpecificSelection = hasSpecificTopicSelected || hasSpecificSubTaskSelected;
-    const hasAnySelection = selectedTaskIds.length > 0 || hasAnySpecificSelection;
-
-    // Compile from subjectMastery
-    currentSubjects.forEach(s => {
-      const isSubjectSelectedInIds = 
-        selectedTaskIds.includes(`subject-${s.id}`) || 
-        selectedTaskIds.includes(s.id) || 
-        selectedTaskIds.some(id => 
-          id.toLowerCase() === s.name.toLowerCase() || 
-          id.toLowerCase() === `subject-${s.name.toLowerCase()}` ||
-          id.toLowerCase().includes(s.id.toLowerCase())
-        );
-
-      s.modules.forEach(m => {
-        m.topics.forEach((topic) => {
-          let shouldStage = false;
-
-          if (topic.selected === true || isSubjectSelectedInIds) {
-            shouldStage = true;
-          } else if (!hasAnySelection) {
-            // Nothing selected at all - default populate all
-            shouldStage = true;
-          }
-
-          if (shouldStage) {
-            stagedItems.push({
-              id: `${s.id}_${m.id}_${topic.id}`,
-              subjectId: s.id,
-              subjectName: s.name,
-              taskCategory: s.taskType || 'STUDY',
-              priority: s.priority || 'low',
-              moduleId: m.id,
-              moduleName: m.name,
-              topicId: topic.id,
-              topicTitle: topic.title,
-              isStaged: true,
-              isCompleted: topic.completed,
-              stagedAt: new Date().toISOString()
-            });
-            if (!newActiveTaskIds.includes(`subject-${s.id}`)) {
-              newActiveTaskIds.push(`subject-${s.id}`);
-            }
-          }
-        });
-      });
-    });
-
-    // Compile from regular tasks and journey daily_tasks
-    const combinedTasks = [...currentRegularTasks, ...currentJourneyTasks];
-    const processedTaskIds = new Set<string>();
-
-    combinedTasks.forEach(t => {
-      if (processedTaskIds.has(t.id)) return;
-      processedTaskIds.add(t.id);
-
-      const isTaskSelectedInIds = selectedTaskIds.includes(t.id);
-
-      if (t.subTasks && t.subTasks.length > 0) {
-        let addedAny = false;
-        t.subTasks.forEach(st => {
-          let shouldStage = false;
-          if (st.selected === true || isTaskSelectedInIds) {
-            shouldStage = true;
-          } else if (!hasAnySelection) {
-            shouldStage = true;
-          }
-
-          if (shouldStage) {
-            stagedItems.push({
-              id: `${t.id}_${st.id}`,
-              subjectId: t.id,
-              subjectName: t.subject || 'General',
-              taskCategory: t.taskType || 'DAILY',
-              priority: t.priority || 'low',
-              moduleId: t.id,
-              moduleName: t.task_title,
-              topicId: st.id,
-              topicTitle: st.title,
-              isStaged: true,
-              isCompleted: st.completed,
-              stagedAt: new Date().toISOString()
-            });
-            addedAny = true;
-          }
-        });
-        if (addedAny && !newActiveTaskIds.includes(t.id)) {
-          newActiveTaskIds.push(t.id);
-        }
-      } else {
-        let shouldStage = false;
-        if (isTaskSelectedInIds || !hasAnySelection) {
-          shouldStage = true;
-        }
-
-        if (shouldStage) {
-          stagedItems.push({
-            id: `${t.id}_default`,
-            subjectId: t.id,
-            subjectName: t.subject || 'General',
-            taskCategory: t.taskType || 'DAILY',
-            priority: t.priority || 'low',
-            moduleId: t.id,
-            moduleName: t.task_title,
-            topicId: 'default',
-            topicTitle: t.task_title,
-            isStaged: true,
-            isCompleted: t.completed,
-            stagedAt: new Date().toISOString()
-          });
-          if (!newActiveTaskIds.includes(t.id)) {
-            newActiveTaskIds.push(t.id);
-          }
-        }
-      }
-    });
-
-    // If stagedItems is still empty (e.g., stale selected IDs or no active selection matched),
-    // force populate ALL subjects and tasks so clicking POPULATE & START SESSION never leaves session empty!
-    if (stagedItems.length === 0) {
-      currentSubjects.forEach(s => {
-        s.modules.forEach(m => {
-          m.topics.forEach((topic) => {
-            stagedItems.push({
-              id: `${s.id}_${m.id}_${topic.id}`,
-              subjectId: s.id,
-              subjectName: s.name,
-              taskCategory: s.taskType || 'STUDY',
-              priority: s.priority || 'low',
-              moduleId: m.id,
-              moduleName: m.name,
-              topicId: topic.id,
-              topicTitle: topic.title,
-              isStaged: true,
-              isCompleted: topic.completed,
-              stagedAt: new Date().toISOString()
-            });
-            if (!newActiveTaskIds.includes(`subject-${s.id}`)) {
-              newActiveTaskIds.push(`subject-${s.id}`);
-            }
-          });
-        });
-      });
-
-      combinedTasks.forEach(t => {
-        if (t.subTasks && t.subTasks.length > 0) {
-          t.subTasks.forEach(st => {
-            stagedItems.push({
-              id: `${t.id}_${st.id}`,
-              subjectId: t.id,
-              subjectName: t.subject || 'General',
-              taskCategory: t.taskType || 'DAILY',
-              priority: t.priority || 'low',
-              moduleId: t.id,
-              moduleName: t.task_title,
-              topicId: st.id,
-              topicTitle: st.title,
-              isStaged: true,
-              isCompleted: st.completed,
-              stagedAt: new Date().toISOString()
-            });
-          });
-        } else {
-          stagedItems.push({
-            id: `${t.id}_default`,
-            subjectId: t.id,
-            subjectName: t.subject || 'General',
-            taskCategory: t.taskType || 'DAILY',
-            priority: t.priority || 'low',
-            moduleId: t.id,
-            moduleName: t.task_title,
-            topicId: 'default',
-            topicTitle: t.task_title,
-            isStaged: true,
-            isCompleted: t.completed,
-            stagedAt: new Date().toISOString()
-          });
-        }
-        if (!newActiveTaskIds.includes(t.id)) {
-          newActiveTaskIds.push(t.id);
-        }
-      });
-    }
-
-    setActiveSessionTaskIds(newActiveTaskIds);
-
-    // Optimistic local state update so UI updates immediately even before network roundtrip
-    const totalTasks = stagedItems.length;
-    const completedTasks = stagedItems.filter(i => i.isCompleted).length;
-    setActiveSession({
-      date: todayStr,
-      items: stagedItems,
-      isActive: totalTasks > 0,
-      totalTasks,
-      completedTasks
-    });
-    setActiveSessionActive(totalTasks > 0);
-
-    // Commit to Firestore asynchronously
-    commitDailySession(todayStr, stagedItems).catch(console.error);
+    // Sync starter data to Firebase asynchronously
+    DEFAULT_STARTER_SUBJECTS.forEach(s => syncSubjectToFirebase(s).catch(console.error));
+    DEFAULT_STARTER_TASKS.forEach(t => syncTaskToFirebase(t).catch(console.error));
   };
 
   // Unified task compile helper
@@ -746,12 +711,12 @@ export const PlannerView = ({
             journey={journey}
             setJourney={setJourney}
             selectedTaskIds={selectedTaskIds}
-            setSelectedTaskIds={setSelectedTaskIds}
+            setSelectedTaskIds={handleSetSelectedTaskIds}
             activeSessionTaskIds={activeSessionTaskIds}
             setActiveSessionTaskIds={setActiveSessionTaskIds}
             activeSessionActive={activeSessionActive}
             setActiveSessionActive={setActiveSessionActive}
-            onStartSession={handleStartSession}
+            onPopulateStarterRoadmap={handlePopulateStarterRoadmap}
             tasks={tasks}
             subjectMastery={subjectMastery}
             onToggleSubTask={handleToggleSubTaskSelection}

@@ -13,6 +13,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { subscribeToSubjects, syncSubjectToFirebase } from './lib/firebase/subjects';
 import { subscribeToTasks, syncTaskToFirebase, removeTaskFromFirebase, resetDailyRegularTasks } from './lib/firebase/tasks';
 import { recordDailyTaskCompletion, ensureAndFetchUserStats } from './lib/firebase/progressTracker';
+import { toggleMultipleStagedItems } from './lib/firebase/session';
 import { DEFAULT_STARTER_SUBJECTS, DEFAULT_STARTER_TASKS } from './mockData';
 
 export const BLANK_JOURNEY: StudyJourney = {
@@ -167,13 +168,21 @@ export default function App() {
 
     const newState = !task.completed;
     const limitVal = task.targetCount !== undefined ? task.targetCount : (task.limit || 1);
+    
+    // Recursively set all subtasks completion status to match main task
+    const updatedSubTasks = task.subTasks?.map(st => ({
+      ...st,
+      completed: newState
+    })) || [];
+
     const updatedTask: Task = { 
       ...task, 
       completed: newState, 
       isCompleted: newState,
       completedAt: newState ? new Date().toISOString() : undefined,
       count: newState ? limitVal : 0,
-      currentCount: newState ? limitVal : 0
+      currentCount: newState ? limitVal : 0,
+      subTasks: updatedSubTasks
     };
     
     const xpReward = task.xp_reward || 50;
@@ -191,6 +200,15 @@ export default function App() {
 
     if (user) {
       await syncTaskToFirebase(updatedTask);
+      
+      // Keep Active Focus Session in sync with task completion
+      const todayStr = new Date().toISOString().split('T')[0];
+      const itemIds = task.subTasks && task.subTasks.length > 0
+        ? task.subTasks.map(st => `${task.id}_${st.id}`)
+        : [`${task.id}_default`];
+
+      toggleMultipleStagedItems(todayStr, itemIds, newState).catch(console.error);
+
       const updatedUserStats = await recordDailyTaskCompletion(xpDelta, task.subject || 'GENERAL');
       if (updatedUserStats) {
         setStats(updatedUserStats);

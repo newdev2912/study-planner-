@@ -68,6 +68,44 @@ export const toggleCompletedStagedItem = async (
   }
 };
 
+// Toggle completed status of multiple items inside the daily focus session in batch
+export const toggleMultipleStagedItems = async (
+  date: string,
+  itemIds: string[],
+  completed: boolean
+): Promise<void> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId || itemIds.length === 0) return;
+
+  const path = `users/${userId}/dailyFocusSessions/${date}`;
+  try {
+    const sessionRef = doc(db, path);
+    const snapshot = await getDoc(sessionRef);
+    if (!snapshot.exists()) return;
+
+    const data = snapshot.data() as DailyFocusSession;
+    const updatedItems = (data.items || []).map(item => {
+      if (itemIds.includes(item.id)) {
+        return { ...item, isCompleted: completed };
+      }
+      return item;
+    });
+
+    const totalTasks = updatedItems.length;
+    const completedTasks = updatedItems.filter(i => i.isCompleted).length;
+
+    await setDoc(sessionRef, {
+      items: updatedItems,
+      totalTasks,
+      completedTasks,
+      date,
+      isActive: totalTasks > 0
+    }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
 // Listen to the daily focus session in real-time
 export const listenToDailySession = (
   date: string,
