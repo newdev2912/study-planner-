@@ -10,6 +10,8 @@ import { cn } from '../../lib/utils';
 import { priorityTheme } from './PlannerTheme';
 import { ProgressBar } from '../Shared';
 import { FocusModePanel, COLOR_THEMES, ColorThemeKey } from './FocusModePanel';
+import { updateSubjectPriority, updateSubjectTaskType } from '../../lib/firebase/subjects';
+import { syncTaskToFirebase } from '../../lib/firebase/tasks';
 
 interface CentralPanelProps {
   journey: StudyJourney;
@@ -216,9 +218,7 @@ export const CentralPanel = ({
   const handleUpdateTaskPriorityUnified = (taskId: string, priority: 'high' | 'medium' | 'low' | 'on-going') => {
     if (taskId.startsWith("subject-")) {
       const subjectId = taskId.replace("subject-", "");
-      import('../../lib/firebase/subjects').then(mod => {
-        mod.updateSubjectPriority(subjectId, priority);
-      }).catch(console.error);
+      updateSubjectPriority(subjectId, priority).catch(console.error);
       setActivePriorityMenu(null);
       return;
     }
@@ -227,9 +227,7 @@ export const CentralPanel = ({
     if (isDaily) {
       const task = tasks.find(t => t.id === taskId);
       if (task) {
-        import('../../lib/firebase/tasks').then(mod => {
-          mod.syncTaskToFirebase({ ...task, priority });
-        }).catch(console.error);
+        syncTaskToFirebase({ ...task, priority }).catch(console.error);
       }
       setActivePriorityMenu(null);
       return;
@@ -251,9 +249,7 @@ export const CentralPanel = ({
   const handleUpdateTaskTypeUnified = (taskId: string, taskType: 'DAILY' | 'CODE' | 'STUDY') => {
     if (taskId.startsWith("subject-")) {
       const subjectId = taskId.replace("subject-", "");
-      import('../../lib/firebase/subjects').then(mod => {
-        mod.updateSubjectTaskType(subjectId, taskType);
-      }).catch(console.error);
+      updateSubjectTaskType(subjectId, taskType).catch(console.error);
       setActivePawMenu(null);
       return;
     }
@@ -262,9 +258,7 @@ export const CentralPanel = ({
     if (isDaily) {
       const task = tasks.find(t => t.id === taskId);
       if (task) {
-        import('../../lib/firebase/tasks').then(mod => {
-          mod.syncTaskToFirebase({ ...task, taskType });
-        }).catch(console.error);
+        syncTaskToFirebase({ ...task, taskType }).catch(console.error);
       }
       setActivePawMenu(null);
       return;
@@ -424,6 +418,12 @@ export const CentralPanel = ({
       subjectMastery.forEach(s => {
         const sTaskId = `subject-${s.id}`;
         if (!list.some(item => item.id === sTaskId)) {
+          const isSubjectStagedInSession = 
+            selectedTaskIds.includes(sTaskId) || 
+            selectedTaskIds.includes(s.id) ||
+            activeSessionTaskIds.includes(sTaskId) ||
+            (activeSession?.items?.some((item: any) => item.subjectId === s.id && item.isStaged)) || false;
+
           list.push({
             id: sTaskId,
             subject: s.name,
@@ -435,11 +435,24 @@ export const CentralPanel = ({
             xp_reward: 100,
             type: 'subject',
             subTasks: (s.modules || []).flatMap((m, mIdx) => 
-              (m.topics || []).map((topic, tIdx) => ({
-                id: `sub-topic-${s.id}-${mIdx}-${tIdx}`,
-                title: `${m.name}: ${topic.title}`,
-                completed: topic.completed
-              }))
+              (m.topics || []).map((topic, tIdx) => {
+                const isTopicStagedInSession = 
+                  topic.selected || 
+                  isSubjectStagedInSession ||
+                  (activeSession?.items?.some((item: any) => 
+                    item.subjectId === s.id && 
+                    item.moduleId === m.id && 
+                    item.topicId === topic.id && 
+                    item.isStaged
+                  )) || false;
+
+                return {
+                  id: `sub-topic-${s.id}-${mIdx}-${tIdx}`,
+                  title: `${m.name}: ${topic.title}`,
+                  completed: topic.completed,
+                  selected: isTopicStagedInSession
+                };
+              })
             )
           });
         }

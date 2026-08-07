@@ -664,6 +664,12 @@ export const PlannerView = ({
       subjectMastery.forEach(s => {
         const sTaskId = `subject-${s.id}`;
         if (!list.some(item => item.id === sTaskId)) {
+          const isSubjectStagedInSession = 
+            selectedTaskIds.includes(sTaskId) || 
+            selectedTaskIds.includes(s.id) ||
+            activeSessionTaskIds.includes(sTaskId) ||
+            (activeSession?.items?.some((item: any) => item.subjectId === s.id && item.isStaged)) || false;
+
           list.push({
             id: sTaskId,
             subject: s.name,
@@ -675,12 +681,24 @@ export const PlannerView = ({
             xp_reward: 100,
             type: 'subject',
             subTasks: (s.modules || []).flatMap((m, mIdx) => 
-              (m.topics || []).map((topic, tIdx) => ({
-                id: `sub-topic-${s.id}-${mIdx}-${tIdx}`,
-                title: `${m.name}: ${topic.title}`,
-                completed: topic.completed,
-                selected: topic.selected || false
-              }))
+              (m.topics || []).map((topic, tIdx) => {
+                const isTopicStagedInSession = 
+                  topic.selected || 
+                  isSubjectStagedInSession ||
+                  (activeSession?.items?.some((item: any) => 
+                    item.subjectId === s.id && 
+                    item.moduleId === m.id && 
+                    item.topicId === topic.id && 
+                    item.isStaged
+                  )) || false;
+
+                return {
+                  id: `sub-topic-${s.id}-${mIdx}-${tIdx}`,
+                  title: `${m.name}: ${topic.title}`,
+                  completed: topic.completed,
+                  selected: isTopicStagedInSession
+                };
+              })
             )
           });
         }

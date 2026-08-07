@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DashboardPanel } from './DashboardPanel';
 import { syncSubjectToFirebase, deleteSubjectFromFirebase } from '../lib/firebase/subjects';
+import { toggleCompletedStagedItem } from '../lib/firebase/session';
+import { recordDailyTaskCompletion } from '../lib/firebase/progressTracker';
 import { cn } from '../lib/utils';
 
 interface SubjectsPanelProps {
@@ -133,13 +135,9 @@ export const SubjectsPanel = ({ subjects, setSubjects }: SubjectsPanelProps) => 
     if (updates.completed !== undefined) {
       const todayStr = new Date().toISOString().split('T')[0];
       const itemId = `${subjectId}_${moduleId}_${topicId}`;
-      import('../lib/firebase/session').then(mod => {
-        mod.toggleCompletedStagedItem(todayStr, itemId, updates.completed!).catch(console.error);
-      });
+      toggleCompletedStagedItem(todayStr, itemId, updates.completed!).catch(console.error);
       if (updates.completed) {
-        import('../lib/firebase/progressTracker').then(mod => {
-          mod.recordDailyTaskCompletion(50, 'FOCUS').catch(console.error);
-        });
+        recordDailyTaskCompletion(50, 'FOCUS').catch(console.error);
       }
     }
   };
