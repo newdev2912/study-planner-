@@ -5,7 +5,6 @@ import { MOCK_JOURNEY } from './mockData';
 import { Header } from './components/Header';
 import { HomeView } from './components/HomeView';
 import { PlannerView } from './components/PlannerView';
-import { AIChat } from './components/AIChat';
 import { AuthPage } from './components/AuthPage';
 import { db, auth } from './lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -42,12 +41,7 @@ export default function App() {
   const [subjectMastery, setSubjectMastery] = useState<SubjectData[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-    { role: 'ai', text: "Hello! I'm your academic assistant. Ask me anything about your studies!" }
-  ]);
-  const [isGenerating, setIsGenerating] = useState(false);
+
 
   const initialLoadDone = useRef(false);
 
@@ -344,96 +338,6 @@ export default function App() {
   const handleUpdateFocusGoal = (goal: string) => {
     setStats(prev => ({ ...prev, focusGoal: goal }));
   };
-const handleSendMessage = async (e?: React.FormEvent) => {
-  if (e) e.preventDefault();
-  if (!chatInput.trim() || isGenerating) return;
-
-  const userMessage = chatInput.trim();
-  setChatInput("");
-
-  // 1. Prepare chat messages history
-  const updatedMessages = [
-    ...chatMessages,
-    { role: 'user' as const, text: userMessage },
-    { role: 'ai' as const, text: '' } // Placeholder for streaming output
-  ];
-  setChatMessages(updatedMessages);
-  setIsGenerating(true);
-
-  try {
-    // Determine base URL from VITE_BACKEND_URL or VITE_OLLAMA_URL, falling back to ngrok tunnel
-    const rawUrl = (import.meta.env.VITE_BACKEND_URL as string | undefined) || (import.meta.env.VITE_OLLAMA_URL as string | undefined);
-    const baseUrl = (rawUrl && rawUrl.trim() !== '') ? rawUrl : 'https://epiphany-machinist-ranking.ngrok-free.dev';
-    const endpoint = `${baseUrl.replace(/\/$/, '')}/api/chat`;
-
-    // 2. Format history for Ollama's API schema
-    const ollamaMessages = updatedMessages.slice(1, -1).map(m => ({
-      role: m.role === 'ai' ? 'assistant' : 'user',
-      content: m.text
-    }));
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true'
-      },
-      body: JSON.stringify({
-        model: 'llama3.2', // Ensure this matches your local Ollama model name
-        messages: ollamaMessages,
-        stream: true
-      })
-    });
-
-    if (!res.ok || !res.body) {
-      throw new Error(`Server status ${res.status}`);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let accumulatedText = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-
-        try {
-          const data = JSON.parse(line);
-          if (data.message?.content) {
-            accumulatedText += data.message.content;
-            
-            // Update UI token by token
-            setChatMessages(prev => {
-              const next = [...prev];
-              next[next.length - 1] = { role: 'ai', text: accumulatedText };
-              return next;
-            });
-          }
-        } catch (e) {
-          // Ignore incomplete JSON stream lines
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Stream Error:', err);
-    setChatMessages(prev => {
-      const next = [...prev];
-      next[next.length - 1] = {
-        role: 'ai',
-        text: "⚠️ Stream error. Check 'ollama serve' and ngrok connection!"
-      };
-      return next;
-    });
-  } finally {
-    setIsGenerating(false);
-  }
-};
 
   const downloadJournal = () => {
     const content = stats.journalEntries.map(e => `## ${e.date}\n**Prompt:** ${e.prompt}\n\n${e.content}\n\n---`).join('\n\n');
@@ -526,15 +430,7 @@ const handleSendMessage = async (e?: React.FormEvent) => {
         )}
       </main>
 
-      <AIChat 
-        isOpen={isChatOpen} 
-        setIsOpen={setIsChatOpen} 
-        input={chatInput}
-        setInput={setChatInput}
-        messages={chatMessages}
-        isGenerating={isGenerating}
-        onSendMessage={handleSendMessage}
-      />
+      
     </div>
   );
 }
