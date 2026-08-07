@@ -53,6 +53,19 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (!u) {
+        initialLoadDone.current = false;
+        setStats({
+          totalXP: 0,
+          level: 1,
+          streak: 0,
+          tasksCompleted: 0,
+          lastActiveDate: new Date().toISOString(),
+          focusGoal: "Master core coursework and maintain daily consistency",
+          journalEntries: []
+        });
+        setJourney(BLANK_JOURNEY);
+        setSubjectMastery([]);
+        setTasks([]);
         setLoading(false);
       }
     });
@@ -64,6 +77,7 @@ export default function App() {
     if (!user) return;
 
     const loadData = async () => {
+      initialLoadDone.current = false;
       try {
         // User Stats & Streak initialization/sync
         const loadedStats = await ensureAndFetchUserStats(user.uid);
@@ -128,22 +142,22 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // 3. Save Data (Firestore AND Local Backup)
+  // 3. Save Data (Firestore AND Local Backup per user)
   useEffect(() => {
     if (!user || !initialLoadDone.current) return;
-    localStorage.setItem('academia_quest_stats', JSON.stringify(stats));
+    localStorage.setItem(`academia_quest_stats_${user.uid}`, JSON.stringify(stats));
     setDoc(doc(db, 'users', user.uid), stats).catch(console.error);
   }, [stats, user]);
 
   useEffect(() => {
     if (!user || !initialLoadDone.current) return;
-    localStorage.setItem('academia_quest_journey', JSON.stringify(journey));
+    localStorage.setItem(`academia_quest_journey_${user.uid}`, JSON.stringify(journey));
     setDoc(doc(db, 'journeys', user.uid), journey).catch(console.error);
   }, [journey, user]);
 
   useEffect(() => {
     if (!user || !initialLoadDone.current) return;
-    localStorage.setItem('academia_quest_mastery', JSON.stringify(subjectMastery));
+    localStorage.setItem(`academia_quest_mastery_${user.uid}`, JSON.stringify(subjectMastery));
     // Individual subject sync is now handled by SubjectsPanel.tsx
   }, [subjectMastery, user]);
 

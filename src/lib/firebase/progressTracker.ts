@@ -169,8 +169,8 @@ export const recordDailyTaskCompletion = async (
   // 3. Update overall user stats in root user doc
   const statsRef = doc(db, 'users', userId);
   const statsSnap = await getDoc(statsRef);
-  let currentTotalXP = 250;
-  let currentTasksCompleted = 2;
+  let currentTotalXP = 0;
+  let currentTasksCompleted = 0;
   let focusGoal = "Master core coursework and maintain daily consistency";
   let journalEntries: any[] = [];
 
@@ -181,8 +181,8 @@ export const recordDailyTaskCompletion = async (
     if (data.focusGoal) focusGoal = data.focusGoal;
     if (data.journalEntries) journalEntries = data.journalEntries;
   } else {
-    currentTotalXP = Math.max(0, 250 + xpGained);
-    currentTasksCompleted = Math.max(0, 2 + (xpGained > 0 ? 1 : 0));
+    currentTotalXP = Math.max(0, xpGained);
+    currentTasksCompleted = Math.max(0, xpGained > 0 ? 1 : 0);
   }
 
   const level = Math.floor(Math.sqrt(currentTotalXP / 100)) + 1;
@@ -190,7 +190,7 @@ export const recordDailyTaskCompletion = async (
   const updatedStats: UserStats = {
     totalXP: currentTotalXP,
     level,
-    streak: updatedStreak > 0 ? updatedStreak : 1,
+    streak: updatedStreak,
     tasksCompleted: currentTasksCompleted,
     lastActiveDate: new Date().toISOString(),
     focusGoal,

@@ -215,7 +215,20 @@ export const GamifiedProfile = ({ stats, journey, level, levelProgress }: Gamifi
               hasDeadline: false
             };
           });
-          setDailyLogsMap(prev => ({ ...sessionLogs, ...prev }));
+          setDailyLogsMap(prev => {
+            const merged = { ...sessionLogs, ...prev };
+            // Ensure we keep maximum recorded XP and tasks if both logs and sessions exist
+            Object.keys(sessionLogs).forEach(dateKey => {
+              if (prev[dateKey]) {
+                merged[dateKey] = {
+                  ...prev[dateKey],
+                  xpEarned: Math.max(prev[dateKey].xpEarned, sessionLogs[dateKey].xpEarned),
+                  tasksCompleted: Math.max(prev[dateKey].tasksCompleted, sessionLogs[dateKey].tasksCompleted)
+                };
+              }
+            });
+            return merged;
+          });
         },
         (error) => {
           console.warn("Firestore listener for dailyFocusSessions:", error.message);
@@ -229,6 +242,13 @@ export const GamifiedProfile = ({ stats, journey, level, levelProgress }: Gamifi
       if (unsubscribeSessions) unsubscribeSessions();
     };
   }, []);
+
+  // Sync selectedDay when dailyLogsMap updates for selected date
+  useEffect(() => {
+    if (dailyLogsMap[selectedDay.isoDate]) {
+      setSelectedDay(dailyLogsMap[selectedDay.isoDate]);
+    }
+  }, [dailyLogsMap, selectedDay.isoDate]);
 
   const getRank = (lvl: number) => {
     if (lvl < 5) return "Academic Novice";
