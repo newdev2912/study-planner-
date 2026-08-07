@@ -29,6 +29,7 @@ interface CentralPanelProps {
   activeSession?: any | null;
   activeSessionTasks?: Task[];
   onToggleSubTaskCompletion?: (taskId: string, subTaskId: string) => void;
+  onClearSession: () => void;
 }
 
 export const CentralPanel = ({
@@ -46,7 +47,8 @@ export const CentralPanel = ({
   onToggleSubTask,
   activeSession = null,
   activeSessionTasks = [],
-  onToggleSubTaskCompletion
+  onToggleSubTaskCompletion,
+  onClearSession
 }: CentralPanelProps) => {
   const [viewMode, setViewMode] = useState<'archive' | 'focus'>('archive');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -427,6 +429,7 @@ export const CentralPanel = ({
             onUpdateTime={handleUpdateTime}
             focusThemeKey={focusThemeKey}
             setFocusThemeKey={setFocusThemeKey}
+            onClearSession={onClearSession}
           />
         )}
       </div>

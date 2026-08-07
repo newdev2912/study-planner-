@@ -40,7 +40,7 @@ export const CompletedPanel = ({
       <div className="flex items-center justify-between pb-1.5 mb-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span className="text-[10px] font-black tracking-[0.2em] text-slate-300 uppercase font-jakarta">COMPLETED OBJECTIVES</span>
+          <span className="text-[10px] font-black tracking-[0.2em] text-slate-300 uppercase font-jakarta">COMPLETED</span>
         </div>
         <span className="text-[9px] font-mono text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
           {tab === 'study' ? completedStudyGroups.length : completedDailyGroups.length} Done

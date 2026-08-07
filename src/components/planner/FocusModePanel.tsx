@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, Target, Edit2, Check, X, ShieldAlert, Sparkles, Clock, Zap, PawPrint } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { EndSessionButton } from './EndSessionButton';
 
 interface FocusModeProps {
   maxTimeMinutes: number;
@@ -13,6 +14,7 @@ interface FocusModeProps {
   onUpdateTime: (minutes: number) => void;
   currentThemeKey?: ColorThemeKey;
   onThemeChange?: (key: ColorThemeKey) => void;
+  onClearSession: () => void;
 }
 
 export type ColorThemeKey = 'cyan' | 'emerald' | 'violet' | 'amber' | 'rose';
@@ -128,6 +130,7 @@ export const FocusModePanel: React.FC<FocusModeProps> = ({
   onUpdateTime,
   currentThemeKey = 'cyan',
   onThemeChange,
+  onClearSession
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editMinutes, setEditMinutes] = useState(maxTimeMinutes);
@@ -375,6 +378,9 @@ export const FocusModePanel: React.FC<FocusModeProps> = ({
               >
                 <RotateCcw className="w-4 h-4"/>
               </button>
+
+              {/* End Session Button */}
+              <EndSessionButton onEndSession={onClearSession} />
             </div>
           </div>
         )}

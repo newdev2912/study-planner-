@@ -137,7 +137,7 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-cyan-400"/>
           <h3 className="text-xs font-black uppercase text-slate-200 tracking-widest font-jakarta">
-            Consistency Index
+            ACTIVITY TRACKER
           </h3>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-[10px] font-black uppercase tracking-wider group cursor-pointer hover:scale-105 hover:bg-amber-500/20 transition-all duration-300">

@@ -303,6 +303,49 @@ export const PlannerView = ({
     });
   };
 
+  const handleClearSession = () => {
+    const updatedSubjectMastery = subjectMastery.map(s => {
+      const hasSelection = s.modules?.some(m => m.topics?.some(t => t.selected));
+      if (!hasSelection) return s;
+      const nextSub = {
+        ...s,
+        modules: (s.modules || []).map(m => ({
+          ...m,
+          topics: (m.topics || []).map(t => ({ ...t, selected: false }))
+        }))
+      };
+      syncSubjectToFirebase(nextSub).catch(console.error);
+      return nextSub;
+    });
+
+    const updatedTasks = tasks.map(t => {
+      const hasSelection = t.subTasks?.some(st => st.selected);
+      if (!hasSelection) return t;
+      const nextTask = {
+        ...t,
+        subTasks: t.subTasks?.map(st => ({ ...st, selected: false }))
+      };
+      syncTaskToFirebase(nextTask).catch(console.error);
+      return nextTask;
+    });
+
+    const updatedJourneyTasks = journey.daily_tasks.map(t => {
+      const hasSelection = t.subTasks?.some(st => st.selected);
+      if (!hasSelection) return t;
+      return {
+        ...t,
+        subTasks: t.subTasks?.map(st => ({ ...st, selected: false }))
+      };
+    });
+
+    setSubjectMastery(updatedSubjectMastery);
+    setTasks(updatedTasks);
+    setJourney(prev => ({ ...prev, daily_tasks: updatedJourneyTasks }));
+    setSelectedTaskIds([]);
+
+    syncActiveSessionWithSelections(updatedSubjectMastery, updatedJourneyTasks, [], updatedTasks, true);
+  };
+
   // Handle toggling subtasks selection from Central Panel (staged for today)
   const handleToggleSubTaskSelection = (taskId: string, subTaskId: string) => {
     if (taskId.startsWith("subject-")) {
@@ -903,6 +946,7 @@ export const PlannerView = ({
             activeSessionActive={activeSessionActive}
             onToggleSubTask={handleToggleSubTaskCompletion}
             activeSession={activeSession}
+            onClearSession={handleClearSession}
           />
         </div>
 
@@ -924,6 +968,7 @@ export const PlannerView = ({
             activeSession={activeSession}
             activeSessionTasks={activeSessionTasks}
             onToggleSubTaskCompletion={handleToggleSubTaskCompletion}
+            onClearSession={handleClearSession}
           />
         </div>
 

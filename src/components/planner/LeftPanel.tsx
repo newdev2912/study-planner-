@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  BookOpen, CheckSquare, Square, ShieldAlert, Sparkles, Circle, CheckCircle2, Check
+  BookOpen, CheckSquare, Square, ShieldAlert, Sparkles, Circle, CheckCircle2, Check, Trash2
 } from 'lucide-react';
 import { Task } from '../../types';
 import { cn } from '../../lib/utils';
@@ -12,13 +12,15 @@ interface LeftPanelProps {
   activeSessionActive: boolean;
   onToggleSubTask: (taskId: string, subTaskId: string) => void;
   activeSession?: any | null;
+  onClearSession: () => void;
 }
 
 export const LeftPanel = ({
   activeSessionTasks,
   activeSessionActive,
   onToggleSubTask,
-  activeSession = null
+  activeSession = null,
+  onClearSession
 }: LeftPanelProps) => {
   // Use real-time activeSession items if present
   const hasFirestoreSession = activeSession && activeSession.items && activeSession.items.length > 0;
@@ -69,9 +71,18 @@ export const LeftPanel = ({
   return (
     <div className="w-full h-full bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col p-4 overflow-hidden backdrop-blur-md relative hover:z-10 hover:border-cyan-500/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300">
       {/* Header section */}
-      <div className="flex items-center gap-2 pb-1.5 mb-2 flex-shrink-0">
-        <BookOpen className="w-4 h-4 text-cyan-400" />
-        <span className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">ACTIVE SESSION CHECKLISTS</span>
+      <div className="flex items-center justify-between pb-1.5 mb-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-cyan-400" />
+          <span className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">ACTIVE SESSION</span>
+        </div>
+        <button 
+          onClick={onClearSession}
+          className="text-slate-500 hover:text-red-400 transition-colors p-1"
+          title="Clear Session"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Hierarchical Checklist Container */}

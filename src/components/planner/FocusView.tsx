@@ -13,6 +13,7 @@ interface FocusViewProps {
   onUpdateTime: (minutes: number) => void;
   focusThemeKey: ColorThemeKey;
   setFocusThemeKey: (key: ColorThemeKey) => void;
+  onClearSession: () => void;
 }
 
 export const FocusView: React.FC<FocusViewProps> = ({
@@ -25,7 +26,8 @@ export const FocusView: React.FC<FocusViewProps> = ({
   activeSessionActive,
   onUpdateTime,
   focusThemeKey,
-  setFocusThemeKey
+  setFocusThemeKey,
+  onClearSession
 }) => {
   return (
     <motion.div 
@@ -47,6 +49,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
         onUpdateTime={onUpdateTime}
         currentThemeKey={focusThemeKey}
         onThemeChange={setFocusThemeKey}
+        onClearSession={onClearSession}
       />
     </motion.div>
   );
