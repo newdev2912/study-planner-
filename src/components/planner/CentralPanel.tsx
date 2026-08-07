@@ -985,8 +985,14 @@ export const CentralPanel = ({
                                         );
                                       }
                                       return subjectObj.modules.map((m: any) => {
-                                        const allTopicsSelected = m.topics && m.topics.length > 0 && m.topics.every((t: any) => t.selected);
-                                        const anyTopicSelected = m.topics && m.topics.some((t: any) => t.selected);
+                                        const isSubjectStagedInSession = 
+                                          selectedTaskIds.includes(task.id) || 
+                                          selectedTaskIds.includes(subId) ||
+                                          activeSessionTaskIds.includes(task.id) ||
+                                          (activeSession?.items?.some((item: any) => item.subjectId === subId && item.isStaged)) || false;
+
+                                        const allTopicsSelected = isSubjectStagedInSession || (m.topics && m.topics.length > 0 && m.topics.every((t: any) => t.selected));
+                                        const anyTopicSelected = isSubjectStagedInSession || (m.topics && m.topics.some((t: any) => t.selected));
                                         return (
                                           <div key={m.id} className="space-y-2 border-l border-slate-850 pl-3 ml-1">
                                             {/* Module Header with Staging Checkbox */}
@@ -1020,7 +1026,7 @@ export const CentralPanel = ({
                                             {/* Topics List */}
                                             <div className="space-y-1.5 pl-1">
                                               {m.topics?.map((topic: any) => {
-                                                const isTopicSelected = topic.selected || false;
+                                                const isTopicSelected = topic.selected || isSubjectStagedInSession || false;
                                                 const isTopicCompleted = topic.completed || false;
                                                 return (
                                                   <div

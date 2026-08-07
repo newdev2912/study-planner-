@@ -126,41 +126,41 @@ export const PlannerView = ({
 
           if (subTaskId === "subject-stage-all") {
             isStagedAction = true;
-            nextSub.modules = s.modules.map(m => ({
+            nextSub.modules = (s.modules || []).map(m => ({
               ...m,
-              topics: m.topics.map(t => ({ ...t, selected: true }))
+              topics: (m.topics || []).map(t => ({ ...t, selected: true }))
             }));
           } else if (subTaskId === "subject-unstage-all") {
             isUnstagedAction = true;
-            nextSub.modules = s.modules.map(m => ({
+            nextSub.modules = (s.modules || []).map(m => ({
               ...m,
-              topics: m.topics.map(t => ({ ...t, selected: false }))
+              topics: (m.topics || []).map(t => ({ ...t, selected: false }))
             }));
           } else if (subTaskId.startsWith("module-stage:")) {
             const modId = subTaskId.replace("module-stage:", "");
-            nextSub.modules = s.modules.map(m => {
+            nextSub.modules = (s.modules || []).map(m => {
               if (m.id === modId) {
                 return {
                   ...m,
-                  topics: m.topics.map(t => ({ ...t, selected: true }))
+                  topics: (m.topics || []).map(t => ({ ...t, selected: true }))
                 };
               }
               return m;
             });
           } else if (subTaskId.startsWith("module-unstage:")) {
             const modId = subTaskId.replace("module-unstage:", "");
-            nextSub.modules = s.modules.map(m => {
+            nextSub.modules = (s.modules || []).map(m => {
               if (m.id === modId) {
                 return {
                   ...m,
-                  topics: m.topics.map(t => ({ ...t, selected: false }))
+                  topics: (m.topics || []).map(t => ({ ...t, selected: false }))
                 };
               }
               return m;
             });
           } else {
-            nextSub.modules = s.modules.map(m => {
-              const updatedTopics = m.topics.map(topic => {
+            nextSub.modules = (s.modules || []).map(m => {
+              const updatedTopics = (m.topics || []).map(topic => {
                 const matches = subTaskId.includes(topic.id) || subTaskId.endsWith(topic.title.replace(/\s+/g, '-'));
                 if (matches || topic.id === subTaskId) {
                   return { ...topic, selected: !topic.selected };
