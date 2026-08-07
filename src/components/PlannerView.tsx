@@ -449,13 +449,11 @@ export const PlannerView = ({
           id.toLowerCase().includes(s.id.toLowerCase())
         );
 
-      const hasSubjectSpecificTopicSelected = s.modules.some(m => m.topics.some(t => t.selected === true));
-
       s.modules.forEach(m => {
         m.topics.forEach((topic) => {
           let shouldStage = false;
 
-          if (topic.selected === true || isSubjectSelectedInIds || hasSubjectSpecificTopicSelected) {
+          if (topic.selected === true || isSubjectSelectedInIds) {
             shouldStage = true;
           } else if (!hasAnySelection) {
             // Nothing selected at all - default populate all
@@ -667,8 +665,7 @@ export const PlannerView = ({
           const isSubjectStagedInSession = 
             selectedTaskIds.includes(sTaskId) || 
             selectedTaskIds.includes(s.id) ||
-            activeSessionTaskIds.includes(sTaskId) ||
-            (activeSession?.items?.some((item: any) => item.subjectId === s.id && item.isStaged)) || false;
+            activeSessionTaskIds.includes(sTaskId);
 
           list.push({
             id: sTaskId,
