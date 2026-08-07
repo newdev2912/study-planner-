@@ -8,11 +8,12 @@ import { PlannerView } from './components/PlannerView';
 import { AIChat } from './components/AIChat';
 import { AuthPage } from './components/AuthPage';
 import { db, auth } from './lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { subscribeToSubjects } from './lib/firebase/subjects';
+import { subscribeToSubjects, syncSubjectToFirebase } from './lib/firebase/subjects';
 import { subscribeToTasks, syncTaskToFirebase, removeTaskFromFirebase, resetDailyRegularTasks } from './lib/firebase/tasks';
 import { recordDailyTaskCompletion, ensureAndFetchUserStats } from './lib/firebase/progressTracker';
+import { DEFAULT_STARTER_SUBJECTS, DEFAULT_STARTER_TASKS } from './mockData';
 
 export const BLANK_JOURNEY: StudyJourney = {
   journey_title: "My Academic Journey",
@@ -100,12 +101,8 @@ export default function App() {
       } else {
         if (seededSubjectsRef.current !== user.uid) {
           seededSubjectsRef.current = user.uid;
-          import('./mockData').then(({ DEFAULT_STARTER_SUBJECTS }) => {
-            import('./lib/firebase/subjects').then(({ syncSubjectToFirebase }) => {
-              DEFAULT_STARTER_SUBJECTS.forEach(s => syncSubjectToFirebase(s));
-            });
-            setSubjectMastery(DEFAULT_STARTER_SUBJECTS);
-          });
+          DEFAULT_STARTER_SUBJECTS.forEach(s => syncSubjectToFirebase(s));
+          setSubjectMastery(DEFAULT_STARTER_SUBJECTS);
         } else {
           setSubjectMastery([]);
         }
@@ -124,12 +121,8 @@ export default function App() {
       } else {
         if (seededTasksRef.current !== user.uid) {
           seededTasksRef.current = user.uid;
-          import('./mockData').then(({ DEFAULT_STARTER_TASKS }) => {
-            import('./lib/firebase/tasks').then(({ syncTaskToFirebase }) => {
-              DEFAULT_STARTER_TASKS.forEach(t => syncTaskToFirebase(t));
-            });
-            setTasks(DEFAULT_STARTER_TASKS);
-          });
+          DEFAULT_STARTER_TASKS.forEach(t => syncTaskToFirebase(t));
+          setTasks(DEFAULT_STARTER_TASKS);
         } else {
           setTasks([]);
         }
@@ -265,7 +258,6 @@ export default function App() {
       
       if (user) {
         // We don't delete the user auth, just the data docs
-        const { deleteDoc, doc } = await import('firebase/firestore');
         await Promise.all([
           deleteDoc(doc(db, 'users', user.uid)),
           deleteDoc(doc(db, 'journeys', user.uid)),

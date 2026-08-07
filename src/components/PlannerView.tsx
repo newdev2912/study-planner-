@@ -4,6 +4,11 @@ import { TopPanel } from './planner/TopPanel';
 import { LeftPanel } from './planner/LeftPanel';
 import { CentralPanel } from './planner/CentralPanel';
 import { RightPanel } from './planner/RightPanel';
+import { DEFAULT_STARTER_SUBJECTS, DEFAULT_STARTER_TASKS } from '../mockData';
+import { listenToDailySession, commitDailySession, toggleCompletedStagedItem } from '../lib/firebase/session';
+import { recordDailyTaskCompletion } from '../lib/firebase/progressTracker';
+import { syncSubjectToFirebase } from '../lib/firebase/subjects';
+import { syncTaskToFirebase } from '../lib/firebase/tasks';
 
 interface PlannerViewProps {
   journey: StudyJourney;
@@ -41,16 +46,12 @@ export const PlannerView = ({
   // Real-time Firestore session sync subscription
   useEffect(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    let unsubscribe = () => {};
-    
-    import('../lib/firebase/session').then(mod => {
-      unsubscribe = mod.listenToDailySession(todayStr, (session) => {
-        if (session) {
-          setActiveSession(session);
-          setActiveSessionActive(session.isActive);
-        }
-      });
-    }).catch(console.error);
+    const unsubscribe = listenToDailySession(todayStr, (session) => {
+      if (session) {
+        setActiveSession(session);
+        setActiveSessionActive(session.isActive);
+      }
+    });
 
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
@@ -171,9 +172,7 @@ export const PlannerView = ({
           }
 
           // Sync to Firebase!
-          import('../lib/firebase/subjects').then(mod => {
-            mod.syncSubjectToFirebase(nextSub);
-          }).catch(console.error);
+          syncSubjectToFirebase(nextSub).catch(console.error);
           return nextSub;
         }
         return s;
@@ -208,9 +207,7 @@ export const PlannerView = ({
             subTasks: updatedSubTasks
           };
           // Sync to Firebase
-          import('../lib/firebase/tasks').then(mod => {
-            mod.syncTaskToFirebase(updatedTask);
-          }).catch(console.error);
+          syncTaskToFirebase(updatedTask).catch(console.error);
 
           const hasAnySelected = updatedSubTasks.some(st => st.selected);
           if (hasAnySelected) {
@@ -282,19 +279,15 @@ export const PlannerView = ({
     }
 
     // 2. BACKGROUND FIREBASE SESSION UPDATE
-    import('../lib/firebase/session').then(mod => {
-      mod.toggleCompletedStagedItem(todayStr, itemId, nextCompletedState).catch(console.error);
-    });
+    toggleCompletedStagedItem(todayStr, itemId, nextCompletedState).catch(console.error);
 
     // Record XP and streak progress when checking off a focus task
     if (nextCompletedState) {
-      import('../lib/firebase/progressTracker').then(mod => {
-        mod.recordDailyTaskCompletion(50, 'FOCUS').then(updatedStats => {
-          if (updatedStats && setStats) {
-            setStats(updatedStats);
-          }
-        }).catch(console.error);
-      });
+      recordDailyTaskCompletion(50, 'FOCUS').then(updatedStats => {
+        if (updatedStats && setStats) {
+          setStats(updatedStats);
+        }
+      }).catch(console.error);
     }
 
     // 3. OPTIMISTIC UPDATE & BACKGROUND SYNC FOR SUBJECT MASTERY
@@ -332,9 +325,7 @@ export const PlannerView = ({
       setSubjectMastery(updated);
       const updatedSub = updated.find(s => s.id === subId || subId.includes(s.id) || s.id.includes(subId));
       if (updatedSub) {
-        import('../lib/firebase/subjects').then(mod => {
-          mod.syncSubjectToFirebase(updatedSub).catch(console.error);
-        });
+        syncSubjectToFirebase(updatedSub).catch(console.error);
       }
     }
 
@@ -358,9 +349,7 @@ export const PlannerView = ({
             subTasks: updatedSubTasks,
             completed: allCompleted
           };
-          import('../lib/firebase/tasks').then(mod => {
-            mod.syncTaskToFirebase(updatedTask).catch(console.error);
-          });
+          syncTaskToFirebase(updatedTask).catch(console.error);
         }
       }
     }
@@ -419,7 +408,6 @@ export const PlannerView = ({
     let currentRegularTasks = [...(tasks || [])];
 
     // Auto-populate starter coursework if user dashboard/archive is empty
-    const { DEFAULT_STARTER_SUBJECTS, DEFAULT_STARTER_TASKS } = await import('../mockData');
     if (currentSubjects.length === 0 && currentJourneyTasks.length === 0 && currentRegularTasks.length === 0) {
       currentSubjects = DEFAULT_STARTER_SUBJECTS;
       currentJourneyTasks = DEFAULT_STARTER_TASKS;
@@ -431,13 +419,8 @@ export const PlannerView = ({
       }));
 
       // Sync starter data to Firebase asynchronously
-      import('../lib/firebase/subjects').then(mod => {
-        currentSubjects.forEach(s => mod.syncSubjectToFirebase(s));
-      }).catch(console.error);
-
-      import('../lib/firebase/tasks').then(mod => {
-        currentJourneyTasks.forEach(t => mod.syncTaskToFirebase(t));
-      }).catch(console.error);
+      currentSubjects.forEach(s => syncSubjectToFirebase(s).catch(console.error));
+      currentJourneyTasks.forEach(t => syncTaskToFirebase(t).catch(console.error));
     }
 
     const stagedItems: StagedFocusItem[] = [];
@@ -457,13 +440,22 @@ export const PlannerView = ({
 
     // Compile from subjectMastery
     currentSubjects.forEach(s => {
-      const isSubjectSelectedInIds = selectedTaskIds.includes(`subject-${s.id}`) || selectedTaskIds.includes(s.id);
-      
+      const isSubjectSelectedInIds = 
+        selectedTaskIds.includes(`subject-${s.id}`) || 
+        selectedTaskIds.includes(s.id) || 
+        selectedTaskIds.some(id => 
+          id.toLowerCase() === s.name.toLowerCase() || 
+          id.toLowerCase() === `subject-${s.name.toLowerCase()}` ||
+          id.toLowerCase().includes(s.id.toLowerCase())
+        );
+
+      const hasSubjectSpecificTopicSelected = s.modules.some(m => m.topics.some(t => t.selected === true));
+
       s.modules.forEach(m => {
         m.topics.forEach((topic) => {
           let shouldStage = false;
 
-          if (topic.selected === true || isSubjectSelectedInIds) {
+          if (topic.selected === true || isSubjectSelectedInIds || hasSubjectSpecificTopicSelected) {
             shouldStage = true;
           } else if (!hasAnySelection) {
             // Nothing selected at all - default populate all
@@ -644,9 +636,7 @@ export const PlannerView = ({
     setActiveSessionActive(totalTasks > 0);
 
     // Commit to Firestore asynchronously
-    import('../lib/firebase/session').then(({ commitDailySession }) => {
-      commitDailySession(todayStr, stagedItems).catch(console.error);
-    }).catch(console.error);
+    commitDailySession(todayStr, stagedItems).catch(console.error);
   };
 
   // Unified task compile helper
