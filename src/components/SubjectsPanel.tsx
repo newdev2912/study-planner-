@@ -1,6 +1,6 @@
 import { Activity, Plus, Trash2, ChevronRight, ChevronDown, Check, Calendar, Clock } from 'lucide-react';
 import { ProgressBar } from './Shared';
-import { SubjectData, ModuleData, TopicData, PriorityLevel } from '../types';
+import { SubjectData, ModuleData, TopicData, PriorityLevel, UserStats } from '../types';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DashboardPanel } from './DashboardPanel';
@@ -12,9 +12,10 @@ import { cn } from '../lib/utils';
 interface SubjectsPanelProps {
   subjects: SubjectData[];
   setSubjects: (subjects: SubjectData[]) => void;
+  setStats?: React.Dispatch<React.SetStateAction<UserStats>>;
 }
 
-export const SubjectsPanel = ({ subjects, setSubjects }: SubjectsPanelProps) => {
+export const SubjectsPanel = ({ subjects, setSubjects, setStats }: SubjectsPanelProps) => {
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState("");
@@ -136,9 +137,22 @@ export const SubjectsPanel = ({ subjects, setSubjects }: SubjectsPanelProps) => 
       const todayStr = new Date().toISOString().split('T')[0];
       const itemId = `${subjectId}_${moduleId}_${topicId}`;
       toggleCompletedStagedItem(todayStr, itemId, updates.completed!).catch(console.error);
-      if (updates.completed) {
-        recordDailyTaskCompletion(50, 'FOCUS').catch(console.error);
+
+      const xpDelta = updates.completed ? 50 : -50;
+      if (setStats) {
+        setStats(s => ({
+          ...s,
+          totalXP: Math.max(0, s.totalXP + xpDelta),
+          tasksCompleted: Math.max(0, s.tasksCompleted + (updates.completed ? 1 : -1)),
+          lastActiveDate: new Date().toISOString()
+        }));
       }
+
+      recordDailyTaskCompletion(xpDelta, 'FOCUS').then(updatedStats => {
+        if (updatedStats && setStats) {
+          setStats(updatedStats);
+        }
+      }).catch(console.error);
     }
   };
 

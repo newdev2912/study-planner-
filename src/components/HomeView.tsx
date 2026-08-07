@@ -20,6 +20,7 @@ interface HomeViewProps {
   handleAddTask: (type: 'regular' | 'subject') => void;
   handleRemoveTask: (taskId: string) => void;
   handleUpdateTask: (taskId: string, updates: Partial<Task>) => void;
+  setStats?: React.Dispatch<React.SetStateAction<UserStats>>;
 }
 
 export const HomeView = ({ 
@@ -37,6 +38,7 @@ export const HomeView = ({
   handleAddTask,
   handleRemoveTask,
   handleUpdateTask,
+  setStats,
 }: HomeViewProps) => {
   return (
     <div className="h-full relative overflow-hidden">
@@ -87,6 +89,7 @@ export const HomeView = ({
           <SubjectsPanel 
             subjects={subjectMastery} 
             setSubjects={setSubjectMastery} 
+            setStats={setStats}
           />
         </div>
 

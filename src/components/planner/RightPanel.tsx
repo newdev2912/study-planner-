@@ -6,7 +6,7 @@ import { ConsistencyPanel } from './ConsistencyPanel';
 interface RightPanelProps {
   activeSession: DailyFocusSession | null;
   activeSessionTasks: Task[];
-  onToggleSubTask: (taskId: string, subTaskId: string) => void;
+  onToggleSubTask: (taskId: string, subTaskId: string, forceState?: boolean) => void;
   stats?: any;
   subjectMastery?: SubjectData[];
 }

@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+
 import "dotenv/config";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -41,9 +41,10 @@ You are the Master Intelligence Engine for "AcademiaQuest," an advanced, gamifie
 You must return a valid JSON object matching the requested schema.
 `;
 
+const app = express();
+const PORT = 3000;
+
 async function startServer() {
-  const app = express();
-  const PORT = 3000;
 
   app.use(cors());
   app.use(express.json());
@@ -175,6 +176,7 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -193,4 +195,8 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+
+if (!process.env.VERCEL) {
+  startServer();
+}

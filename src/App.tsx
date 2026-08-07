@@ -209,7 +209,42 @@ export default function App() {
         ? task.subTasks.map(st => `${task.id}_${st.id}`)
         : [`${task.id}_default`];
 
-      toggleMultipleStagedItems(todayStr, itemIds, newState).catch(console.error);
+      const fallbackItems: any[] = [];
+      if (task.subTasks && task.subTasks.length > 0) {
+        task.subTasks.forEach(st => {
+          fallbackItems.push({
+            id: `${task.id}_${st.id}`,
+            subjectId: task.id,
+            subjectName: task.subject || 'General',
+            taskCategory: task.taskType || 'DAILY',
+            priority: task.priority || 'low',
+            moduleId: task.id,
+            moduleName: task.task_title,
+            topicId: st.id,
+            topicTitle: st.title,
+            isStaged: true,
+            isCompleted: newState,
+            stagedAt: new Date().toISOString()
+          });
+        });
+      } else {
+        fallbackItems.push({
+          id: `${task.id}_default`,
+          subjectId: task.id,
+          subjectName: task.subject || 'General',
+          taskCategory: task.taskType || 'DAILY',
+          priority: task.priority || 'low',
+          moduleId: task.id,
+          moduleName: task.task_title,
+          topicId: 'default',
+          topicTitle: task.task_title,
+          isStaged: true,
+          isCompleted: newState,
+          stagedAt: new Date().toISOString()
+        });
+      }
+
+      toggleMultipleStagedItems(todayStr, itemIds, newState, fallbackItems).catch(console.error);
 
       const updatedUserStats = await recordDailyTaskCompletion(xpDelta, task.subject || 'GENERAL');
       if (updatedUserStats) {
@@ -469,6 +504,7 @@ const handleSendMessage = async (e?: React.FormEvent) => {
             levelProgress={levelProgress}
             subjectMastery={subjectMastery}
             setSubjectMastery={setSubjectMastery}
+            setStats={setStats}
           />
         ) : (
           <PlannerView 
@@ -485,6 +521,7 @@ const handleSendMessage = async (e?: React.FormEvent) => {
             subjectMastery={subjectMastery}
             setSubjectMastery={setSubjectMastery}
             tasks={tasks}
+            setTasks={setTasks}
           />
         )}
       </main>

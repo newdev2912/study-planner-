@@ -24,6 +24,7 @@ interface PlannerViewProps {
   subjectMastery: SubjectData[];
   setSubjectMastery: (subjects: SubjectData[]) => void;
   tasks?: Task[];
+  setTasks?: React.Dispatch<React.SetStateAction<Task[]>>;
 }
 
 export const PlannerView = ({
@@ -35,7 +36,8 @@ export const PlannerView = ({
   handleToggleTask,
   subjectMastery,
   setSubjectMastery,
-  tasks = []
+  tasks = [],
+  setTasks
 }: PlannerViewProps) => {
   // Task Selection & Active Session States
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -114,7 +116,8 @@ export const PlannerView = ({
     latestSubjects: SubjectData[],
     latestDailyTasks: Task[],
     latestSelectedTaskIds: string[] = selectedTaskIds,
-    latestTasks: Task[] = tasks
+    latestTasks: Task[] = tasks,
+    forceCommit: boolean = true
   ) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const stagedItems: StagedFocusItem[] = [];
@@ -240,7 +243,9 @@ export const PlannerView = ({
     });
     setActiveSessionActive(totalTasks > 0);
 
-    commitDailySession(todayStr, stagedItems).catch(console.error);
+    if (forceCommit || stagedItems.length > 0) {
+      commitDailySession(todayStr, stagedItems).catch(console.error);
+    }
   };
 
   // Real-time Firestore session sync subscription
@@ -252,7 +257,13 @@ export const PlannerView = ({
         setActiveSessionActive(session.isActive);
       } else {
         // Automatically compile and sync today's session if it doesn't exist yet!
-        syncActiveSessionWithSelections(latestSubjectsRef.current, latestDailyTasksRef.current);
+        syncActiveSessionWithSelections(
+          latestSubjectsRef.current,
+          latestDailyTasksRef.current,
+          selectedTaskIds,
+          tasks,
+          false
+        );
       }
     });
 
@@ -439,54 +450,189 @@ export const PlannerView = ({
   };
 
   // Handle toggling subtasks completion from Left Panel (active checklist checkoff)
-  const handleToggleSubTaskCompletion = (taskId: string, subTaskId: string) => {
+  const handleToggleSubTaskCompletion = (taskId: string, subTaskId: string, forceState?: boolean) => {
     const itemId = taskId.includes('_') ? taskId : `${taskId}_${subTaskId}`;
     const todayStr = new Date().toISOString().split('T')[0];
 
     // Find current item in activeSession if exists
     const currentItem = activeSession?.items?.find((i: any) => i.id === itemId);
-    const nextCompletedState = currentItem ? !currentItem.isCompleted : true;
+    
+    let nextCompletedState = true;
+    if (forceState !== undefined) {
+      nextCompletedState = forceState;
+    } else if (currentItem) {
+      nextCompletedState = !currentItem.isCompleted;
+    } else {
+      // Find fallback default state from existing models
+      const parts = itemId.split('_');
+      const rootId = parts[0] || taskId;
+      const subId = rootId.startsWith("subject-") ? rootId.replace("subject-", "") : rootId;
+      const modId = parts[1] || "";
+      const topId = parts[2] || subTaskId;
+      const isSubjectItem = rootId.startsWith("subject-") || parts.length >= 3;
+      
+      if (isSubjectItem && subId) {
+        const subject = subjectMastery.find(s => s.id === subId);
+        const module = subject?.modules?.find(m => m.id === modId);
+        const topic = module?.topics?.find(t => t.id === topId);
+        if (topic) {
+          nextCompletedState = !topic.completed;
+        }
+      } else {
+        const realTaskId = rootId;
+        const realSubTaskId = parts[1] || subTaskId;
+        if (realTaskId.startsWith("task-") && tasks) {
+          const task = tasks.find(t => t.id === realTaskId);
+          const subTask = task?.subTasks?.find(st => st.id === realSubTaskId);
+          if (subTask) {
+            nextCompletedState = !subTask.completed;
+          } else if (task) {
+            nextCompletedState = !task.completed;
+          }
+        } else {
+          const dailyTask = journey.daily_tasks.find(t => t.id === realTaskId);
+          const subTask = dailyTask?.subTasks?.find(st => st.id === realSubTaskId);
+          if (subTask) {
+            nextCompletedState = !subTask.completed;
+          } else if (dailyTask) {
+            nextCompletedState = !dailyTask.completed;
+          }
+        }
+      }
+    }
+
+    // Build fallback item if not currently in activeSession
+    const parts = itemId.split('_');
+    const rootId = parts[0] || taskId;
+    const isSubjectItem = parts.length >= 3 || rootId.startsWith("subject-") || currentItem?.subjectId;
+    let fallbackItem: any = undefined;
+
+    if (!currentItem) {
+      const subId = rootId.startsWith("subject-") ? rootId.replace("subject-", "") : rootId;
+      const modId = parts[1] || "";
+      const topId = parts[2] || subTaskId;
+      
+      if (isSubjectItem && subId) {
+        const subject = subjectMastery.find(s => s.id === subId);
+        const module = subject?.modules?.find(m => m.id === modId);
+        const topic = module?.topics?.find(t => t.id === topId);
+        if (subject && module && topic) {
+          fallbackItem = {
+            id: itemId,
+            subjectId: subject.id,
+            subjectName: subject.name,
+            taskCategory: subject.taskType || 'STUDY',
+            priority: subject.priority || 'low',
+            moduleId: module.id,
+            moduleName: module.name,
+            topicId: topic.id,
+            topicTitle: topic.title,
+            isStaged: true,
+            isCompleted: nextCompletedState,
+            stagedAt: new Date().toISOString()
+          };
+        }
+      } else {
+        const realTaskId = rootId;
+        const realSubTaskId = parts[1] || subTaskId;
+        const combinedTasks = [...(tasks || []), ...(journey.daily_tasks || [])];
+        const task = combinedTasks.find(t => t.id === realTaskId);
+
+        if (task) {
+          if (realSubTaskId && realSubTaskId !== 'default') {
+            const subTask = task.subTasks?.find(st => st.id === realSubTaskId);
+            if (subTask) {
+              fallbackItem = {
+                id: itemId,
+                subjectId: task.id,
+                subjectName: task.subject || 'General',
+                taskCategory: task.taskType || 'DAILY',
+                priority: task.priority || 'low',
+                moduleId: task.id,
+                moduleName: task.task_title,
+                topicId: subTask.id,
+                topicTitle: subTask.title,
+                isStaged: true,
+                isCompleted: nextCompletedState,
+                stagedAt: new Date().toISOString()
+              };
+            }
+          } else {
+            fallbackItem = {
+              id: itemId,
+              subjectId: task.id,
+              subjectName: task.subject || 'General',
+              taskCategory: task.taskType || 'DAILY',
+              priority: task.priority || 'low',
+              moduleId: task.id,
+              moduleName: task.task_title,
+              topicId: 'default',
+              topicTitle: task.task_title,
+              isStaged: true,
+              isCompleted: nextCompletedState,
+              stagedAt: new Date().toISOString()
+            };
+          }
+        }
+      }
+    }
 
     // 1. OPTIMISTIC UPDATE: Update activeSession state instantly!
-    if (activeSession && activeSession.items) {
-      setActiveSession((prevSession: any) => {
-        if (!prevSession || !prevSession.items) return prevSession;
-        const updatedItems = prevSession.items.map((item: any) => {
-          if (item.id === itemId) {
-            return { ...item, isCompleted: nextCompletedState };
-          }
-          return item;
-        });
-        const completedTasks = updatedItems.filter((i: any) => i.isCompleted).length;
-        return {
-          ...prevSession,
-          items: updatedItems,
-          completedTasks
-        };
+    setActiveSession((prevSession: any) => {
+      const currentItems = prevSession?.items || [];
+      let found = false;
+      const updatedItems = currentItems.map((item: any) => {
+        if (item.id === itemId) {
+          found = true;
+          return { ...item, isCompleted: nextCompletedState, isStaged: true };
+        }
+        return item;
       });
+
+      if (!found && fallbackItem) {
+        updatedItems.push({ ...fallbackItem, isCompleted: nextCompletedState, isStaged: true });
+      }
+
+      const completedTasks = updatedItems.filter((i: any) => i.isCompleted).length;
+      const totalTasks = updatedItems.length;
+      return {
+        ...(prevSession || {}),
+        date: todayStr,
+        items: updatedItems,
+        isActive: totalTasks > 0,
+        totalTasks,
+        completedTasks
+      };
+    });
+    setActiveSessionActive(true);
+
+    // If undoing, ensure the master task is added to selectedTaskIds
+    if (!nextCompletedState) {
+      const realTaskId = taskId.includes('_') ? taskId.split('_')[0] : taskId;
+      setSelectedTaskIds(prev => prev.includes(realTaskId) ? prev : [...prev, realTaskId]);
     }
 
     // 2. BACKGROUND FIREBASE SESSION UPDATE
-    toggleCompletedStagedItem(todayStr, itemId, nextCompletedState).catch(console.error);
+    toggleCompletedStagedItem(todayStr, itemId, nextCompletedState, fallbackItem).catch(console.error);
 
     // Record XP and streak progress when checking off a focus task
-    if (nextCompletedState) {
-      recordDailyTaskCompletion(50, 'FOCUS').then(updatedStats => {
-        if (updatedStats && setStats) {
-          setStats(updatedStats);
-        }
-      }).catch(console.error);
-    }
+    const xpDelta = nextCompletedState ? 50 : -50;
+    recordDailyTaskCompletion(xpDelta, 'FOCUS').then(updatedStats => {
+      if (updatedStats && setStats) {
+        setStats(updatedStats);
+      }
+    }).catch(console.error);
 
     // 3. OPTIMISTIC UPDATE & BACKGROUND SYNC FOR SUBJECT MASTERY
-    const parts = itemId.split('_');
-    const subId = currentItem?.subjectId || (taskId.startsWith("subject-") ? taskId.replace("subject-", "") : parts[0]);
-    const modId = currentItem?.moduleId || parts[1] || "";
-    const topId = currentItem?.topicId || parts[2] || subTaskId;
+    const partsForSync = itemId.split('_');
+    const rootIdForSync = partsForSync[0] || taskId;
+    const subId = currentItem?.subjectId || (rootIdForSync.startsWith("subject-") ? rootIdForSync.replace("subject-", "") : rootIdForSync);
+    const modId = currentItem?.moduleId || partsForSync[1] || "";
+    const topId = currentItem?.topicId || partsForSync[2] || subTaskId;
 
-    const isSubjectItem = taskId.startsWith("subject-") || parts.length >= 3 || currentItem?.subjectId;
+    const isSubjectItemForSync = rootIdForSync.startsWith("subject-") || partsForSync.length >= 3 || currentItem?.subjectId;
 
-    if (isSubjectItem && subId) {
+    if (isSubjectItemForSync && subId) {
       const updated = subjectMastery.map(s => {
         if (s.id === subId || subId.includes(s.id) || s.id.includes(subId)) {
           return {
@@ -497,7 +643,11 @@ export const PlannerView = ({
                   ...m,
                   topics: m.topics.map(topic => {
                     if (topic.id === topId || topic.title === subTaskId || topic.id === subTaskId) {
-                      return { ...topic, completed: nextCompletedState };
+                      return { 
+                        ...topic, 
+                        completed: nextCompletedState,
+                        selected: !nextCompletedState ? true : topic.selected
+                      };
                     }
                     return topic;
                   })
@@ -518,8 +668,8 @@ export const PlannerView = ({
     }
 
     // 4. OPTIMISTIC UPDATE & BACKGROUND SYNC FOR REGULAR TASKS & JOURNEY
-    const realTaskId = taskId.includes('_') ? taskId.split('_')[0] : taskId;
-    const realSubTaskId = taskId.includes('_') ? taskId.split('_')[1] : subTaskId;
+    const realTaskId = rootIdForSync;
+    const realSubTaskId = partsForSync[1] || subTaskId;
 
     if (realTaskId.startsWith("task-")) {
       if (tasks) {
@@ -527,17 +677,52 @@ export const PlannerView = ({
         if (task) {
           const updatedSubTasks = task.subTasks?.map(st => {
             if (st.id === realSubTaskId || st.id === subTaskId) {
-              return { ...st, completed: nextCompletedState };
+              return { 
+                ...st, 
+                completed: nextCompletedState,
+                selected: !nextCompletedState ? true : st.selected
+              };
             }
             return st;
           }) || [];
-          const allCompleted = updatedSubTasks.length > 0 && updatedSubTasks.every(st => st.completed);
+          const allCompleted = updatedSubTasks.length > 0 
+            ? updatedSubTasks.every(st => st.completed) 
+            : nextCompletedState;
+          const limitVal = task.targetCount !== undefined ? task.targetCount : (task.limit || 1);
+          const wasCompleted = task.completed;
+          
           const updatedTask = {
             ...task,
             subTasks: updatedSubTasks,
-            completed: allCompleted
+            completed: allCompleted,
+            isCompleted: allCompleted,
+            completedAt: allCompleted ? new Date().toISOString() : undefined,
+            count: allCompleted ? limitVal : 0,
+            currentCount: allCompleted ? limitVal : 0
           };
+          if (setTasks) {
+            setTasks(prev => prev.map(t => t.id === realTaskId ? updatedTask : t));
+          }
           syncTaskToFirebase(updatedTask).catch(console.error);
+
+          if (allCompleted && !wasCompleted) {
+            if (setStats) {
+              setStats(s => ({
+                ...s,
+                totalXP: s.totalXP + (task.xp_reward || 50),
+                tasksCompleted: s.tasksCompleted + 1,
+                lastActiveDate: new Date().toISOString()
+              }));
+            }
+          } else if (!allCompleted && wasCompleted) {
+            if (setStats) {
+              setStats(s => ({
+                ...s,
+                totalXP: Math.max(0, s.totalXP - (task.xp_reward || 50)),
+                tasksCompleted: Math.max(0, s.tasksCompleted - 1)
+              }));
+            }
+          }
         }
       }
     }
@@ -548,12 +733,18 @@ export const PlannerView = ({
 
         const subTasks = t.subTasks?.map(st => {
           if (st.id === realSubTaskId || st.id === subTaskId) {
-            return { ...st, completed: nextCompletedState };
+            return { 
+              ...st, 
+              completed: nextCompletedState,
+              selected: !nextCompletedState ? true : st.selected
+            };
           }
           return st;
         }) || [];
 
-        const allCompleted = subTasks.length > 0 && subTasks.every(st => st.completed);
+        const allCompleted = subTasks.length > 0 
+          ? subTasks.every(st => st.completed) 
+          : nextCompletedState;
         const wasCompleted = t.completed;
 
         if (allCompleted && !wasCompleted) {
@@ -610,13 +801,23 @@ export const PlannerView = ({
     if (tasks) {
       tasks.forEach(t => {
         if (!list.some(item => item.id === t.id)) {
+          const isTaskStaged = activeSessionTaskIds.includes(t.id) || selectedTaskIds.includes(t.id);
+          const derivedSubTasks = t.subTasks && t.subTasks.length > 0
+            ? t.subTasks.map(st => ({
+                ...st,
+                selected: st.selected || (activeSession?.items?.some(i => i.id === `${t.id}_${st.id}` && i.isStaged) ?? false)
+              }))
+            : [{
+                id: 'default',
+                title: t.task_title,
+                completed: t.completed,
+                selected: isTaskStaged || (activeSession?.items?.some(i => i.id === `${t.id}_default` && i.isStaged) ?? false)
+              }];
+
           list.push({
             ...t,
             taskType: t.taskType || 'DAILY',
-            subTasks: t.subTasks?.map(st => ({
-              ...st,
-              selected: st.selected || false
-            }))
+            subTasks: derivedSubTasks
           });
         }
       });

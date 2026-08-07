@@ -34,7 +34,8 @@ export const commitDailySession = async (date: string, items: StagedFocusItem[])
 export const toggleCompletedStagedItem = async (
   date: string,
   itemId: string,
-  completed: boolean
+  completed: boolean,
+  itemToAdd?: StagedFocusItem
 ): Promise<void> => {
   const userId = auth.currentUser?.uid;
   if (!userId) return;
@@ -43,15 +44,25 @@ export const toggleCompletedStagedItem = async (
   try {
     const sessionRef = doc(db, path);
     const snapshot = await getDoc(sessionRef);
-    if (!snapshot.exists()) return;
+    
+    let updatedItems: StagedFocusItem[] = [];
+    if (snapshot.exists()) {
+      const data = snapshot.data() as DailyFocusSession;
+      let found = false;
+      updatedItems = (data.items || []).map(item => {
+        if (item.id === itemId) {
+          found = true;
+          return { ...item, isCompleted: completed, isStaged: true };
+        }
+        return item;
+      });
 
-    const data = snapshot.data() as DailyFocusSession;
-    const updatedItems = (data.items || []).map(item => {
-      if (item.id === itemId) {
-        return { ...item, isCompleted: completed };
+      if (!found && itemToAdd) {
+        updatedItems.push({ ...itemToAdd, isCompleted: completed, isStaged: true });
       }
-      return item;
-    });
+    } else if (itemToAdd) {
+      updatedItems = [{ ...itemToAdd, isCompleted: completed, isStaged: true }];
+    }
 
     const totalTasks = updatedItems.length;
     const completedTasks = updatedItems.filter(i => i.isCompleted).length;
@@ -72,24 +83,37 @@ export const toggleCompletedStagedItem = async (
 export const toggleMultipleStagedItems = async (
   date: string,
   itemIds: string[],
-  completed: boolean
+  completed: boolean,
+  fallbackItems?: StagedFocusItem[]
 ): Promise<void> => {
   const userId = auth.currentUser?.uid;
-  if (!userId || itemIds.length === 0) return;
+  if (!userId || (itemIds.length === 0 && (!fallbackItems || fallbackItems.length === 0))) return;
 
   const path = `users/${userId}/dailyFocusSessions/${date}`;
   try {
     const sessionRef = doc(db, path);
     const snapshot = await getDoc(sessionRef);
-    if (!snapshot.exists()) return;
+    let updatedItems: StagedFocusItem[] = [];
 
-    const data = snapshot.data() as DailyFocusSession;
-    const updatedItems = (data.items || []).map(item => {
-      if (itemIds.includes(item.id)) {
-        return { ...item, isCompleted: completed };
-      }
-      return item;
-    });
+    if (snapshot.exists()) {
+      const data = snapshot.data() as DailyFocusSession;
+      updatedItems = (data.items || []).map(item => {
+        if (itemIds.includes(item.id)) {
+          return { ...item, isCompleted: completed, isStaged: true };
+        }
+        return item;
+      });
+    }
+
+    if (fallbackItems && fallbackItems.length > 0) {
+      fallbackItems.forEach(fi => {
+        if (!updatedItems.find(i => i.id === fi.id)) {
+          updatedItems.push({ ...fi, isCompleted: completed, isStaged: true });
+        }
+      });
+    }
+
+    if (updatedItems.length === 0) return;
 
     const totalTasks = updatedItems.length;
     const completedTasks = updatedItems.filter(i => i.isCompleted).length;
@@ -142,7 +166,6 @@ export const listenToDailySession = (
         } else {
           console.error("Error listening to daily focus session:", error);
         }
-        onUpdate(null);
       }
     );
   });
